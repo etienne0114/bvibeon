@@ -1,5 +1,14 @@
 const userService = require('../services/userService');
-const { registerSchema, loginSchema } = require('../models/schemas');
+const { registerSchema, loginSchema, verifyEmailSchema, resendCodeSchema } = require('../models/schemas');
+
+function handleAuthError(res, error) {
+  const status = error.status || 400;
+  res.status(status).json({
+    success: false,
+    error: error.message,
+    ...(error.requiresVerification ? { requiresVerification: true } : {}),
+  });
+}
 
 async function register(req, res) {
   try {
@@ -7,7 +16,7 @@ async function register(req, res) {
     const result = await userService.registerUser(data);
     res.status(201).json({ success: true, ...result });
   } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
+    handleAuthError(res, error);
   }
 }
 
@@ -17,7 +26,27 @@ async function login(req, res) {
     const result = await userService.loginUser(data);
     res.json({ success: true, ...result });
   } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
+    handleAuthError(res, error);
+  }
+}
+
+async function verifyEmail(req, res) {
+  try {
+    const data = verifyEmailSchema.parse(req.body);
+    const result = await userService.verifyEmail(data);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    handleAuthError(res, error);
+  }
+}
+
+async function resendCode(req, res) {
+  try {
+    const data = resendCodeSchema.parse(req.body);
+    const result = await userService.resendVerification(data);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    handleAuthError(res, error);
   }
 }
 
@@ -26,12 +55,14 @@ async function googleAuth(req, res) {
     const result = await userService.loginWithGoogle({ credential: req.body?.credential });
     res.json({ success: true, ...result });
   } catch (error) {
-    res.status(401).json({ success: false, error: error.message });
+    handleAuthError(res, error);
   }
 }
 
 module.exports = {
   register,
   login,
+  verifyEmail,
+  resendCode,
   googleAuth,
 };

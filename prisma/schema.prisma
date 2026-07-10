@@ -17,6 +17,10 @@ model User {
   lastName           String?
   preferredLanguage  String               @default("en")
   isPremium          Boolean              @default(false)
+  emailVerified         Boolean           @default(false)
+  verificationCode      String?
+  verificationExpiresAt DateTime?
+  verificationAttempts  Int               @default(0)
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
   enrollments        CourseEnrollment[]

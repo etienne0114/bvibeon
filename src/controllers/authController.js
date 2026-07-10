@@ -21,7 +21,17 @@ async function login(req, res) {
   }
 }
 
+async function googleAuth(req, res) {
+  try {
+    const result = await userService.loginWithGoogle({ credential: req.body?.credential });
+    res.json({ success: true, ...result });
+  } catch (error) {
+    res.status(401).json({ success: false, error: error.message });
+  }
+}
+
 module.exports = {
   register,
   login,
+  googleAuth,
 };

@@ -1,6 +1,6 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
-const { register, login, verifyEmail, resendCode, forgotPassword, resetPassword, googleAuth } = require('../controllers/authController');
+const { register, login, verifyEmail, resendCode, forgotPassword, verifyResetCode, resetPassword, googleAuth } = require('../controllers/authController');
 
 // Auth endpoints are the main brute-force target — keep limits tight
 const authLimiter = rateLimit({
@@ -26,6 +26,7 @@ router.post('/login', authLimiter, login);
 router.post('/verify-email', authLimiter, verifyEmail);
 router.post('/resend-code', resendLimiter, resendCode);
 router.post('/forgot-password', resendLimiter, forgotPassword);
+router.post('/verify-reset-code', authLimiter, verifyResetCode);
 router.post('/reset-password', authLimiter, resetPassword);
 router.post('/google', authLimiter, googleAuth);
 module.exports = router;

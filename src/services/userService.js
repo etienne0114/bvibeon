@@ -142,10 +142,10 @@ async function resendVerification({ email }) {
 
 async function requestPasswordReset({ email }) {
   const user = await prisma.user.findUnique({ where: { email } });
-  // Same response either way so account existence can't be probed
-  const genericResponse = { message: 'If that email is registered, a reset code is on its way.' };
+  // Product decision: fail fast on unknown emails instead of sending blind,
+  // so we never pay for emails that can't reach an account.
   if (!user) {
-    return genericResponse;
+    throw new AuthError("This email isn't registered. Enter the email you signed up with.", { status: 404 });
   }
   const code = generateCode();
   await prisma.user.update({
@@ -160,27 +160,45 @@ async function requestPasswordReset({ email }) {
     await sendPasswordResetEmail({ to: user.email, username: user.username, code });
   } catch (error) {
     logger.error(`Password reset email failed for ${email}: ${error.message}`);
+    throw new AuthError('We could not send the email. Please try again in a moment.', { status: 502 });
   }
-  return genericResponse;
+  return { message: `We sent a 6-digit reset code to ${user.email}.` };
 }
 
-async function resetPassword({ email, code, newPassword }) {
-  const user = await prisma.user.findUnique({ where: { email } });
+function assertResetCodeValid(user, code) {
   if (!user) {
-    throw new AuthError('Invalid reset code', { status: 401 });
+    throw new AuthError('That code is incorrect. Check your email and try again.', { status: 401 });
   }
   if (!user.resetCode || !user.resetExpiresAt || user.resetExpiresAt < new Date()) {
-    throw new AuthError('Reset code expired. Request a new one.', { status: 410 });
+    throw new AuthError('This code has expired. Request a new one.', { status: 410 });
   }
   if (user.resetAttempts >= MAX_VERIFY_ATTEMPTS) {
-    throw new AuthError('Too many attempts. Request a new code.', { status: 429 });
+    throw new AuthError('Too many wrong attempts. Request a new code.', { status: 429 });
   }
+}
+
+async function verifyResetCode({ email, code }) {
+  const user = await prisma.user.findUnique({ where: { email } });
+  assertResetCodeValid(user, code);
   if (user.resetCode !== hashCode(code)) {
     await prisma.user.update({
       where: { id: user.id },
       data: { resetAttempts: { increment: 1 } },
     });
-    throw new AuthError('Invalid reset code', { status: 401 });
+    throw new AuthError('That code is incorrect. Check your email and try again.', { status: 401 });
+  }
+  return { message: 'Code verified — choose your new password.' };
+}
+
+async function resetPassword({ email, code, newPassword }) {
+  const user = await prisma.user.findUnique({ where: { email } });
+  assertResetCodeValid(user, code);
+  if (user.resetCode !== hashCode(code)) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { resetAttempts: { increment: 1 } },
+    });
+    throw new AuthError('That code is incorrect. Check your email and try again.', { status: 401 });
   }
   const hashed = await bcrypt.hash(newPassword, SALT_ROUNDS);
   const updated = await prisma.user.update({
@@ -292,6 +310,7 @@ module.exports = {
   verifyEmail,
   resendVerification,
   requestPasswordReset,
+  verifyResetCode,
   resetPassword,
   loginWithGoogle,
 };

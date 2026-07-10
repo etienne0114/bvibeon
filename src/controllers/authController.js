@@ -1,13 +1,23 @@
 const userService = require('../services/userService');
+const logger = require('../utils/logger');
 const { registerSchema, loginSchema, verifyEmailSchema, resendCodeSchema, forgotPasswordSchema, resetPasswordSchema } = require('../models/schemas');
 
 function handleAuthError(res, error) {
-  const status = error.status || 400;
-  res.status(status).json({
-    success: false,
-    error: error.message,
-    ...(error.requiresVerification ? { requiresVerification: true } : {}),
-  });
+  // Zod validation errors: surface the first human-readable issue
+  if (Array.isArray(error?.issues) && error.issues.length > 0) {
+    return res.status(400).json({ success: false, error: error.issues[0].message });
+  }
+  // Known auth errors carry their own status and safe message
+  if (error instanceof userService.AuthError) {
+    return res.status(error.status || 400).json({
+      success: false,
+      error: error.message,
+      ...(error.requiresVerification ? { requiresVerification: true } : {}),
+    });
+  }
+  // Anything else is unexpected: log it, never leak internals to the user
+  logger.error(`Auth error: ${error.message}`);
+  return res.status(500).json({ success: false, error: 'Something went wrong on our side. Please try again.' });
 }
 
 async function register(req, res) {
@@ -60,6 +70,16 @@ async function forgotPassword(req, res) {
   }
 }
 
+async function verifyResetCode(req, res) {
+  try {
+    const data = verifyEmailSchema.parse(req.body);
+    const result = await userService.verifyResetCode(data);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    handleAuthError(res, error);
+  }
+}
+
 async function resetPassword(req, res) {
   try {
     const data = resetPasswordSchema.parse(req.body);
@@ -85,6 +105,7 @@ module.exports = {
   verifyEmail,
   resendCode,
   forgotPassword,
+  verifyResetCode,
   resetPassword,
   googleAuth,
 };

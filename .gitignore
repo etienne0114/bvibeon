@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Uploads (user content)
+uploads/
+
+# Prisma generated client
+src/generated/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Vercel
+.vercel/

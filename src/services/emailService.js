@@ -1,10 +1,35 @@
 const axios = require('axios');
+const nodemailer = require('nodemailer');
 const logger = require('../utils/logger');
 
 const RESEND_API_URL = 'https://api.resend.com/emails';
 
 // Resend free tier without a verified domain can only send from onboarding@resend.dev
+// AND only to the Resend account owner's address — real recipients need either a
+// verified domain (resend.com/domains) or the SMTP fallback below.
 const FROM = process.env.EMAIL_FROM || 'Vibeon Learn <onboarding@resend.dev>';
+
+// SMTP fallback (e.g. Gmail with an app password) — delivers to any recipient
+const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || '465', 10);
+const SMTP_USER = process.env.SMTP_USER;
+const SMTP_PASS = process.env.SMTP_PASS;
+
+let smtpTransport = null;
+function getSmtpTransport() {
+  if (!SMTP_USER || !SMTP_PASS) {
+    return null;
+  }
+  if (!smtpTransport) {
+    smtpTransport = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_PORT === 465,
+      auth: { user: SMTP_USER, pass: SMTP_PASS },
+    });
+  }
+  return smtpTransport;
+}
 
 const brand = {
   ink: '#2E1F26',
@@ -67,19 +92,69 @@ function welcomeTemplate(username) {
     </a>`);
 }
 
-async function sendEmail({ to, subject, html }) {
+async function sendViaResend({ to, subject, html }) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
-    logger.warn('RESEND_API_KEY not set; skipping email send');
-    return null;
+    throw new Error('RESEND_API_KEY not set');
   }
   const response = await axios.post(
     RESEND_API_URL,
     { from: FROM, to: [to], subject, html },
     { headers: { Authorization: `Bearer ${apiKey}` }, timeout: 10000 },
   );
-  logger.info(`Email sent to ${to} (id: ${response.data?.id})`);
+  logger.info(`Email sent via Resend to ${to} (id: ${response.data?.id})`);
   return response.data;
+}
+
+async function sendViaSmtp({ to, subject, html }) {
+  const transport = getSmtpTransport();
+  if (!transport) {
+    throw new Error('SMTP fallback not configured (set SMTP_USER and SMTP_PASS)');
+  }
+  const from = process.env.SMTP_FROM || `Vibeon Learn <${SMTP_USER}>`;
+  const info = await transport.sendMail({ from, to, subject, html });
+  logger.info(`Email sent via SMTP to ${to} (id: ${info.messageId})`);
+  return info;
+}
+
+// While the Resend account is in testing mode it can only deliver to the account
+// owner. Once we see that rejection, remember the owner address and stop paying
+// a failed API round-trip (and an error log) for every other recipient.
+let resendOwnerOnly = null;
+
+function resendCanDeliver(to) {
+  return resendOwnerOnly === null || to === resendOwnerOnly;
+}
+
+async function sendEmail({ to, subject, html }) {
+  // Primary: Resend. Its API errors carry the actual reason (e.g. testing-mode
+  // recipient restriction), so surface that instead of a bare status code.
+  let resendError = null;
+  if (process.env.RESEND_API_KEY && resendCanDeliver(to)) {
+    try {
+      return await sendViaResend({ to, subject, html });
+    } catch (error) {
+      resendError = error.response?.data?.message || error.message;
+      const ownerMatch = /own email address \(([^)]+)\)/.exec(resendError || '');
+      if (ownerMatch) {
+        resendOwnerOnly = ownerMatch[1];
+      }
+      logger.warn(`Resend unavailable for ${to}, using SMTP fallback: ${resendError}`);
+    }
+  }
+  // Fallback: plain SMTP (e.g. Gmail app password) — no domain verification needed
+  try {
+    return await sendViaSmtp({ to, subject, html });
+  } catch (error) {
+    logger.error(`SMTP send failed for ${to}: ${error.message}`);
+    // Local development: don't block sign-up on email delivery. The 6-digit
+    // code is part of the subject line, so print it to the server console.
+    if (process.env.NODE_ENV === 'development') {
+      logger.warn(`[DEV EMAIL FALLBACK] To: ${to} | Subject: ${subject}`);
+      return { dev: true };
+    }
+    throw new Error(resendError || error.message);
+  }
 }
 
 async function sendVerificationEmail({ to, username, code }) {

@@ -1,6 +1,6 @@
 const userService = require('../services/userService');
 const logger = require('../utils/logger');
-const { registerSchema, loginSchema, verifyEmailSchema, resendCodeSchema, forgotPasswordSchema, resetPasswordSchema } = require('../models/schemas');
+const { registerSchema, registerStartSchema, registerCompleteSchema, profileSchema, loginSchema, verifyEmailSchema, resendCodeSchema, forgotPasswordSchema, resetPasswordSchema } = require('../models/schemas');
 
 function handleAuthError(res, error) {
   // Zod validation errors: surface the first human-readable issue
@@ -25,6 +25,46 @@ async function register(req, res) {
     const data = registerSchema.parse(req.body);
     const result = await userService.registerUser(data);
     res.status(201).json({ success: true, ...result });
+  } catch (error) {
+    handleAuthError(res, error);
+  }
+}
+
+async function registerStart(req, res) {
+  try {
+    const data = registerStartSchema.parse(req.body);
+    const result = await userService.startRegistration(data);
+    res.status(201).json({ success: true, ...result });
+  } catch (error) {
+    handleAuthError(res, error);
+  }
+}
+
+async function registerCheckCode(req, res) {
+  try {
+    const data = verifyEmailSchema.parse(req.body);
+    const result = await userService.checkVerificationCode(data);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    handleAuthError(res, error);
+  }
+}
+
+async function registerComplete(req, res) {
+  try {
+    const data = registerCompleteSchema.parse(req.body);
+    const result = await userService.completeRegistration(data);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    handleAuthError(res, error);
+  }
+}
+
+async function updateProfile(req, res) {
+  try {
+    const data = profileSchema.parse(req.body);
+    const result = await userService.updateProfile(req.user.id, data);
+    res.json({ success: true, ...result });
   } catch (error) {
     handleAuthError(res, error);
   }
@@ -101,6 +141,10 @@ async function googleAuth(req, res) {
 
 module.exports = {
   register,
+  registerStart,
+  registerCheckCode,
+  registerComplete,
+  updateProfile,
   login,
   verifyEmail,
   resendCode,

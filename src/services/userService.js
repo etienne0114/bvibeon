@@ -91,6 +91,100 @@ async function registerUser({ username, email, password }) {
   };
 }
 
+// Step 1 of the new flow: create the account with a placeholder password and
+// send the code. The real password is only set after the email is verified.
+async function startRegistration({ username, email, firstName = null, lastName = null }) {
+  const byEmail = await prisma.user.findUnique({ where: { email } });
+  if (byEmail && byEmail.emailVerified) {
+    throw new AuthError('Email already registered. Sign in instead.');
+  }
+  const byUsername = await prisma.user.findUnique({ where: { username } });
+  if (byUsername && byUsername.email !== email) {
+    throw new AuthError('Username already taken');
+  }
+  let user;
+  if (byEmail) {
+    // Unverified account restarting sign-up: refresh identity, keep the row
+    user = await prisma.user.update({
+      where: { id: byEmail.id },
+      data: { username, firstName, lastName },
+    });
+  } else {
+    // Unguessable placeholder keeps password login disabled until step 3
+    const placeholder = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), SALT_ROUNDS);
+    user = await prisma.user.create({
+      data: { username, email, password: placeholder, firstName, lastName },
+    });
+  }
+  let message = `We sent a 6-digit verification code to ${user.email}.`;
+  try {
+    await issueVerificationCode(user);
+  } catch (error) {
+    logger.error(`Verification email failed for ${email}: ${error.message}`);
+    message = 'If the code does not arrive shortly, tap "Resend code".';
+  }
+  return { requiresVerification: true, email: user.email, message };
+}
+
+function assertVerificationCodeValid(user) {
+  if (!user) {
+    throw new AuthError('Invalid verification code', { status: 401 });
+  }
+  if (!user.verificationCode || !user.verificationExpiresAt || user.verificationExpiresAt < new Date()) {
+    throw new AuthError('Verification code expired. Request a new one.', { status: 410 });
+  }
+  if (user.verificationAttempts >= MAX_VERIFY_ATTEMPTS) {
+    throw new AuthError('Too many attempts. Request a new code.', { status: 429 });
+  }
+}
+
+// Step 2: validate the code without consuming it, so it can still be
+// presented together with the password in step 3.
+async function checkVerificationCode({ email, code }) {
+  const user = await prisma.user.findUnique({ where: { email } });
+  assertVerificationCodeValid(user);
+  if (user.verificationCode !== hashCode(code)) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { verificationAttempts: { increment: 1 } },
+    });
+    throw new AuthError('Invalid verification code', { status: 401 });
+  }
+  return { message: 'Email verified — now choose your password.' };
+}
+
+// Step 3: code + new password → account becomes verified and usable
+async function completeRegistration({ email, code, password }) {
+  const user = await prisma.user.findUnique({ where: { email } });
+  assertVerificationCodeValid(user);
+  if (user.verificationCode !== hashCode(code)) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { verificationAttempts: { increment: 1 } },
+    });
+    throw new AuthError('Invalid verification code', { status: 401 });
+  }
+  const hashed = await bcrypt.hash(password, SALT_ROUNDS);
+  const verified = await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      password: hashed,
+      emailVerified: true,
+      verificationCode: null,
+      verificationExpiresAt: null,
+      verificationAttempts: 0,
+    },
+  });
+  fireWelcomeEmail(verified);
+  return { user: sanitizeUser(verified), token: signToken(verified.id) };
+}
+
+// Step 4 (optional): basic learner profile, can also be filled in later
+async function updateProfile(userId, data) {
+  const updated = await prisma.user.update({ where: { id: userId }, data });
+  return { user: sanitizeUser(updated) };
+}
+
 async function verifyEmail({ email, code }) {
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
@@ -306,6 +400,10 @@ async function loginWithGoogle({ credential }) {
 module.exports = {
   AuthError,
   registerUser,
+  startRegistration,
+  checkVerificationCode,
+  completeRegistration,
+  updateProfile,
   loginUser,
   verifyEmail,
   resendVerification,

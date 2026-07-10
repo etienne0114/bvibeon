@@ -4,7 +4,10 @@ generator client {
 
 datasource db {
   provider          = "postgresql"
+  // Runtime traffic goes through the transaction pooler (pgbouncer);
+  // migrations need a direct/session connection.
   url               = env("DATABASE_URL")
+  directUrl         = env("DIRECT_URL")
   shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
@@ -16,6 +19,9 @@ model User {
   firstName          String?
   lastName           String?
   preferredLanguage  String               @default("en")
+  learningLanguage   String?
+  proficiencyLevel   String?
+  dailyGoalMinutes   Int?
   isPremium          Boolean              @default(false)
   emailVerified         Boolean           @default(false)
   verificationCode      String?

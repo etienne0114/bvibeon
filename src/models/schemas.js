@@ -15,6 +15,16 @@ const resendCodeSchema = z.object({
   email: z.string().email().toLowerCase(),
 });
 
+const forgotPasswordSchema = z.object({
+  email: z.string().email().toLowerCase(),
+});
+
+const resetPasswordSchema = z.object({
+  email: z.string().email().toLowerCase(),
+  code: z.string().regex(/^\d{6}$/, 'Code must be 6 digits'),
+  newPassword: z.string().min(8, 'Password must be at least 8 characters'),
+});
+
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
@@ -40,6 +50,8 @@ module.exports = {
   loginSchema,
   verifyEmailSchema,
   resendCodeSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
   courseQuerySchema,
   progressSchema,
 };

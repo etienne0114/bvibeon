@@ -1,5 +1,5 @@
 const userService = require('../services/userService');
-const { registerSchema, loginSchema, verifyEmailSchema, resendCodeSchema } = require('../models/schemas');
+const { registerSchema, loginSchema, verifyEmailSchema, resendCodeSchema, forgotPasswordSchema, resetPasswordSchema } = require('../models/schemas');
 
 function handleAuthError(res, error) {
   const status = error.status || 400;
@@ -50,6 +50,26 @@ async function resendCode(req, res) {
   }
 }
 
+async function forgotPassword(req, res) {
+  try {
+    const data = forgotPasswordSchema.parse(req.body);
+    const result = await userService.requestPasswordReset(data);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    handleAuthError(res, error);
+  }
+}
+
+async function resetPassword(req, res) {
+  try {
+    const data = resetPasswordSchema.parse(req.body);
+    const result = await userService.resetPassword(data);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    handleAuthError(res, error);
+  }
+}
+
 async function googleAuth(req, res) {
   try {
     const result = await userService.loginWithGoogle({ credential: req.body?.credential });
@@ -64,5 +84,7 @@ module.exports = {
   login,
   verifyEmail,
   resendCode,
+  forgotPassword,
+  resetPassword,
   googleAuth,
 };

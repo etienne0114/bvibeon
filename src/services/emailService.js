@@ -90,6 +90,29 @@ async function sendVerificationEmail({ to, username, code }) {
   });
 }
 
+function passwordResetTemplate(username, code) {
+  return shell(`
+    <h1 style="color:${brand.ink};font-family:Georgia,serif;font-size:24px;margin:0 0 16px;">Reset your password</h1>
+    <p style="color:${brand.inkSoft};font-size:15px;line-height:1.7;margin:0 0 24px;">
+      Hi ${username} — we received a request to reset your Vibeon Learn password.
+      Use this code to continue. It expires in <strong>10 minutes</strong>.
+    </p>
+    <div style="background:${brand.card};border:1px solid ${brand.line};border-radius:12px;padding:24px;text-align:center;margin-bottom:24px;">
+      <span style="color:${brand.ink};font-size:34px;font-weight:bold;letter-spacing:10px;font-family:Georgia,serif;">${code}</span>
+    </div>
+    <p style="color:${brand.inkSoft};font-size:13px;line-height:1.7;margin:0;">
+      If you didn't request this, ignore this email — your password will stay unchanged.
+    </p>`);
+}
+
+async function sendPasswordResetEmail({ to, username, code }) {
+  return sendEmail({
+    to,
+    subject: `${code} is your Vibeon Learn password reset code`,
+    html: passwordResetTemplate(username, code),
+  });
+}
+
 async function sendWelcomeEmail({ to, username }) {
   return sendEmail({
     to,
@@ -101,5 +124,6 @@ async function sendWelcomeEmail({ to, username }) {
 module.exports = {
   sendEmail,
   sendVerificationEmail,
+  sendPasswordResetEmail,
   sendWelcomeEmail,
 };

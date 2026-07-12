@@ -67,6 +67,8 @@ model Course {
   enrollments       CourseEnrollment[]
   certificates      Certificate[]
   pathSteps         PathStep[]
+
+  @@index([status, category, level])
 }
 
 model Lesson {
@@ -84,6 +86,8 @@ model Lesson {
   course      Course           @relation(fields: [courseId], references: [id])
   progress    LessonProgress[]
   quizzes     Quiz[]
+
+  @@index([courseId, status, order])
 }
 
 model CourseEnrollment {
@@ -98,6 +102,8 @@ model CourseEnrollment {
   course      Course   @relation(fields: [courseId], references: [id])
 
   @@unique([userId, courseId])
+  @@index([userId, enrolledAt(sort: Desc)])
+  @@index([courseId])
 }
 
 model LessonProgress {
@@ -113,6 +119,8 @@ model LessonProgress {
   lesson               Lesson   @relation(fields: [lessonId], references: [id])
 
   @@unique([userId, lessonId])
+  @@index([userId, lastAccessedAt(sort: Desc)])
+  @@index([lessonId])
 }
 
 model LearningPath {
@@ -170,6 +178,8 @@ model LearningGoal {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
 }
 
 model DictionaryLookup {
@@ -204,6 +214,8 @@ model VocabularyItem {
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
   userProgress  VocabularyProgress[]
+
+  @@index([language, difficulty])
 }
 
 model VocabularyProgress {
@@ -223,6 +235,7 @@ model VocabularyProgress {
   vocabularyItem   VocabularyItem @relation(fields: [vocabularyItemId], references: [id])
 
   @@unique([userId, vocabularyItemId])
+  @@index([userId, nextReviewAt])
 }
 
 model RolePlayScenario {
@@ -267,6 +280,8 @@ model LearningSession {
   user        User                  @relation(fields: [userId], references: [id])
   scenario    RolePlayScenario?     @relation(fields: [scenarioId], references: [id])
   interactions LearningInteraction[]
+
+  @@index([userId, startedAt(sort: Desc)])
 }
 
 model LearningInteraction {
@@ -281,6 +296,9 @@ model LearningInteraction {
   createdAt       DateTime        @default(now())
   session         LearningSession @relation(fields: [sessionId], references: [id])
   user            User            @relation(fields: [userId], references: [id])
+
+  @@index([sessionId])
+  @@index([userId, createdAt(sort: Desc)])
 }
 
 model SpeechSession {
@@ -295,6 +313,8 @@ model SpeechSession {
   createdAt        DateTime  @default(now())
   user             User      @relation(fields: [userId], references: [id])
   assessment       SpeechAssessment?
+
+  @@index([userId, createdAt(sort: Desc)])
 }
 
 model SpeechAssessment {
@@ -326,6 +346,8 @@ model Certificate {
   metadata         Json?     // criteria, achievements, scores
   user             User      @relation(fields: [userId], references: [id])
   course           Course?   @relation(fields: [courseId], references: [id])
+
+  @@index([userId])
 }
 
 model Quiz {
@@ -339,6 +361,8 @@ model Quiz {
   lesson      Lesson        @relation(fields: [lessonId], references: [id])
   questions   Question[]
   attempts    QuizAttempt[]
+
+  @@index([lessonId])
 }
 
 model Achievement {
@@ -351,6 +375,8 @@ model Achievement {
   unlockedAt      DateTime @default(now())
   metadata        Json?
   user            User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, unlockedAt(sort: Desc)])
 }
 
 model Question {
@@ -363,6 +389,8 @@ model Question {
   explanation    String?
   points         Int      @default(1)
   quiz           Quiz     @relation(fields: [quizId], references: [id])
+
+  @@index([quizId])
 }
 
 model QuizAttempt {
@@ -376,4 +404,7 @@ model QuizAttempt {
   completedAt DateTime?
   user        User      @relation(fields: [userId], references: [id])
   quiz        Quiz      @relation(fields: [quizId], references: [id])
+
+  @@index([userId, completedAt(sort: Desc)])
+  @@index([quizId])
 }

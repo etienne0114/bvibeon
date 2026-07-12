@@ -130,6 +130,15 @@ async function resetPassword(req, res) {
   }
 }
 
+async function me(req, res) {
+  try {
+    const result = await userService.getMe(req.user.id);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    handleAuthError(res, error);
+  }
+}
+
 async function googleAuth(req, res) {
   try {
     const result = await userService.loginWithGoogle({ credential: req.body?.credential });
@@ -140,6 +149,7 @@ async function googleAuth(req, res) {
 }
 
 module.exports = {
+  me,
   register,
   registerStart,
   registerCheckCode,

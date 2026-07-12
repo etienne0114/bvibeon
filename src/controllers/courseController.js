@@ -13,7 +13,7 @@ async function listCourses(req, res) {
 
 async function getCourse(req, res) {
   try {
-    const course = await courseService.getCourseById(req.params.courseId);
+    const course = await courseService.getCourseById(req.params.courseId, req.user?.id);
     if (!course) {
       return res.status(404).json({ success: false, error: 'Course not found' });
     }

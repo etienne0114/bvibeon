@@ -311,6 +311,14 @@ async function resetPassword({ email, code, newPassword }) {
   return { user: sanitizeUser(updated), token: signToken(updated.id) };
 }
 
+async function getMe(userId) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    throw new AuthError('Account not found', { status: 404 });
+  }
+  return { user: sanitizeUser(user) };
+}
+
 async function loginUser({ email, password }) {
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
@@ -399,6 +407,7 @@ async function loginWithGoogle({ credential }) {
 
 module.exports = {
   AuthError,
+  getMe,
   registerUser,
   startRegistration,
   checkVerificationCode,

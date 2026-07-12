@@ -60,19 +60,34 @@ class LearnService {
    */
   async getLearningDashboard(userId) {
     try {
-      const [stats, courses, activity, goals] = await Promise.all([
+      const [stats, enrollments, activity, goals, weeklyActivity, achievements] = await Promise.all([
         progressService.getLearningStats(userId),
         prisma.courseEnrollment.findMany({
           where: { userId },
-          include: { course: { select: { title: true, imageUrl: true, category: true, level: true } } },
-          orderBy: { enrolledAt: 'desc' },
+          include: {
+            course: {
+              select: {
+                id: true,
+                title: true,
+                imageUrl: true,
+                category: true,
+                level: true,
+                estimatedDuration: true,
+                _count: { select: { lessons: { where: { status: 'PUBLISHED' } } } },
+              },
+            },
+          },
+          orderBy: { updatedAt: 'desc' },
           take: 5,
         }),
         this.getRecentActivity(userId),
         progressService.getGoals(userId),
+        progressService.getWeeklyActivity(userId),
+        progressService.getRecentAchievements(userId, 4),
       ]);
 
-      // Format for frontend expectation
+      const continueLearning = await this.getContinueLearning(userId, enrollments);
+
       return {
         summary: {
           enrolledCourses: stats.courses.enrolled,
@@ -80,14 +95,21 @@ class LearnService {
           activeCourses: stats.courses.enrolled - stats.courses.completed,
           streakDays: stats.overall.streakDays,
           totalTimeMinutes: stats.overall.totalTimeMinutes,
+          lessonsCompleted: stats.overall.completedLessons,
         },
-        recentCourses: courses.map(e => ({
+        recentCourses: enrollments.map(e => ({
           id: e.course.id,
           title: e.course.title,
           progress: e.progress,
+          isCompleted: e.isCompleted,
           imageUrl: e.course.imageUrl,
           category: e.course.category,
+          level: e.course.level,
+          lessonCount: e.course._count.lessons,
         })),
+        continueLearning,
+        weeklyActivity,
+        achievements,
         recentActivity: activity,
         learningGoals: goals,
         generatedAt: new Date().toISOString(),
@@ -96,6 +118,38 @@ class LearnService {
       logger.error('Dashboard service error:', error);
       throw error;
     }
+  }
+
+  /**
+   * The next unfinished lesson in the most recently touched, incomplete course
+   */
+  async getContinueLearning(userId, enrollments) {
+    const active = enrollments.find((e) => !e.isCompleted);
+    if (!active) return null;
+    const lessons = await prisma.lesson.findMany({
+      where: { courseId: active.course.id, status: 'PUBLISHED' },
+      orderBy: { order: 'asc' },
+      select: {
+        id: true,
+        title: true,
+        order: true,
+        duration: true,
+        type: true,
+        progress: { where: { userId }, select: { status: true } },
+      },
+    });
+    const nextLesson = lessons.find((l) => l.progress[0]?.status !== 'COMPLETED') || null;
+    return {
+      courseId: active.course.id,
+      courseTitle: active.course.title,
+      level: active.course.level,
+      progress: active.progress,
+      totalLessons: lessons.length,
+      completedLessons: lessons.filter((l) => l.progress[0]?.status === 'COMPLETED').length,
+      nextLesson: nextLesson
+        ? { id: nextLesson.id, title: nextLesson.title, order: nextLesson.order, duration: nextLesson.duration, type: nextLesson.type }
+        : null,
+    };
   }
 
   async searchCourses(params) {
@@ -122,21 +176,26 @@ class LearnService {
         ? enrollments.reduce((acc, curr) => acc + curr.progress, 0) / enrollments.length 
         : 0;
 
+      const [quizAgg, weeklyActivity] = await Promise.all([
+        prisma.quizAttempt.aggregate({ where: { userId }, _avg: { score: true } }),
+        progressService.getWeeklyActivity(userId),
+      ]);
+      const activeDays = weeklyActivity.filter((d) => d.lessons > 0).length;
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
       return {
-        points: stats.overall.completedLessons * 10,
-        accuracy: 85, // Placeholder for real quiz accuracy
-        consistency: 92,
+        points: stats.overall.completedLessons * 10 + stats.courses.completed * 100,
+        accuracy: Math.round(quizAgg._avg.score || 0),
+        consistency: Math.round((activeDays / 7) * 100),
         averageProgress: avgProgress,
         completedCourses: stats.courses.completed,
-        history: [
-          { day: 'Mon', value: 30 },
-          { day: 'Tue', value: 45 },
-          { day: 'Wed', value: 20 },
-          { day: 'Thu', value: 60 },
-          { day: 'Fri', value: 40 },
-          { day: 'Sat', value: 70 },
-          { day: 'Sun', value: 50 },
-        ],
+        totalTimeMinutes: stats.overall.totalTimeMinutes,
+        streakDays: stats.overall.streakDays,
+        history: weeklyActivity.map((d) => ({
+          day: dayNames[new Date(d.date).getDay()],
+          value: d.minutes,
+          lessons: d.lessons,
+        })),
       };
     } catch (error) {
       logger.error('Analytics service error:', error);

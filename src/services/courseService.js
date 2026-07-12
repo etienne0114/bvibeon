@@ -86,6 +86,54 @@ class CourseService {
   }
 
   /**
+   * Course detail with ordered lessons and (optionally) the user's progress
+   */
+  async getCourseById(courseId, userId = null) {
+    const course = await prisma.course.findFirst({
+      where: { id: courseId, status: 'PUBLISHED' },
+      include: {
+        instructor: { select: { id: true, username: true } },
+        _count: { select: { enrollments: true } },
+        lessons: {
+          where: { status: 'PUBLISHED' },
+          orderBy: { order: 'asc' },
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            order: true,
+            duration: true,
+            type: true,
+            content: true,
+            ...(userId
+              ? { progress: { where: { userId }, select: { status: true, completionPercentage: true, timeSpentMinutes: true } } }
+              : {}),
+          },
+        },
+      },
+    });
+    if (!course) return null;
+
+    let enrollment = null;
+    if (userId) {
+      enrollment = await prisma.courseEnrollment.findUnique({
+        where: { userId_courseId: { userId, courseId } },
+        select: { progress: true, isCompleted: true, enrolledAt: true },
+      });
+    }
+    return {
+      ...course,
+      enrollment,
+      lessons: course.lessons.map((l) => ({
+        ...l,
+        userStatus: l.progress?.[0]?.status || 'NOT_STARTED',
+        userCompletion: l.progress?.[0]?.completionPercentage || 0,
+        progress: undefined,
+      })),
+    };
+  }
+
+  /**
    * Enroll a user in a course
    */
   async enrollUser(userId, courseId) {

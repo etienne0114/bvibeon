@@ -145,7 +145,7 @@ class ProgressService {
    * the connection pool.
    */
   async getStatsAndActivity(userId) {
-    const [statsRows, activityRows] = await Promise.all([
+    const [statsResult, activityResult] = await Promise.allSettled([
       prisma.$queryRaw`
         SELECT
           (SELECT COUNT(*) FROM "LessonProgress" WHERE "userId" = ${userId})::int AS total_lessons,
@@ -165,6 +165,16 @@ class ProgressService {
         GROUP BY 1
       `,
     ]);
+    // A blip in either query degrades to zeroed stats / empty activity rather
+    // than failing the whole dashboard — the user still sees their app.
+    if (statsResult.status === 'rejected') {
+      logger.error('Stats query failed, using zeroed defaults:', statsResult.reason);
+    }
+    if (activityResult.status === 'rejected') {
+      logger.error('Activity query failed, using empty defaults:', activityResult.reason);
+    }
+    const statsRows = statsResult.status === 'fulfilled' ? statsResult.value : [];
+    const activityRows = activityResult.status === 'fulfilled' ? activityResult.value : [];
     const raw = statsRows[0] || {};
     const byDay = new Map(
       activityRows.map((r) => [new Date(r.day).toISOString().slice(0, 10), { minutes: r.minutes, lessons: r.lessons }]),
@@ -203,6 +213,7 @@ class ProgressService {
       courses: { enrolled: raw.enrolled || 0, completed: raw.completed_courses || 0 },
       quizzes: { totalAttempts: raw.quiz_attempts || 0 },
       weeklyActivity,
+      hadError: statsResult.status === 'rejected' || activityResult.status === 'rejected',
     };
   }
 
@@ -310,11 +321,16 @@ class ProgressService {
   }
 
   async getRecentAchievements(userId, take = 4) {
-    return prisma.achievement.findMany({
-      where: { userId },
-      orderBy: { unlockedAt: 'desc' },
-      take,
-    });
+    try {
+      return await prisma.achievement.findMany({
+        where: { userId },
+        orderBy: { unlockedAt: 'desc' },
+        take,
+      });
+    } catch (error) {
+      logger.error('Get recent achievements error:', error);
+      return [];
+    }
   }
 
   /**

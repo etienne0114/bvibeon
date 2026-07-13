@@ -1,11 +1,12 @@
 const learnService = require('../services/learnService');
+const { sendServerError } = require('../utils/errors');
 
 async function getDashboard(req, res) {
   try {
     const data = await learnService.getLearningDashboard(req.user.id);
     res.json({ success: true, data });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    sendServerError(res, error, 'Dashboard service error');
   }
 }
 
@@ -19,7 +20,7 @@ async function searchCourses(req, res) {
     });
     res.json({ success: true, data });
   } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
+    sendServerError(res, error, 'Search courses error');
   }
 }
 
@@ -29,7 +30,7 @@ async function generatePath(req, res) {
     const path = await learnService.generateLearningPath(req.user.id, goal, level);
     res.json({ success: true, data: path });
   } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
+    sendServerError(res, error, 'Generate path error');
   }
 }
 
@@ -38,7 +39,7 @@ async function getAnalytics(req, res) {
     const data = await learnService.getLearningAnalytics(req.user.id);
     res.json({ success: true, data });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    sendServerError(res, error, 'Analytics service error');
   }
 }
 
@@ -47,7 +48,7 @@ async function getMotivation(req, res) {
     const data = await learnService.getLearningMotivation(req.user.id);
     res.json({ success: true, data });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    sendServerError(res, error, 'Motivation service error');
   }
 }
 
@@ -56,7 +57,7 @@ async function getPractices(req, res) {
     const data = await learnService.getPracticeModules(req.user.id);
     res.json({ success: true, data });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    sendServerError(res, error, 'Practices service error');
   }
 }
 
@@ -66,7 +67,7 @@ async function startPracticeSession(req, res) {
     const data = await learnService.startPracticeSession(req.user.id, moduleId);
     res.json({ success: true, data });
   } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
+    sendServerError(res, error, 'Start practice session error');
   }
 }
 

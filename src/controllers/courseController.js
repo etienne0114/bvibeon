@@ -1,5 +1,6 @@
 const courseService = require('../services/courseService');
 const { courseQuerySchema } = require('../models/schemas');
+const { sendServerError } = require('../utils/errors');
 
 async function listCourses(req, res) {
   try {
@@ -7,7 +8,10 @@ async function listCourses(req, res) {
     const data = await courseService.getCourses(query);
     res.json({ success: true, ...data });
   } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
+    if (Array.isArray(error?.issues)) {
+      return res.status(400).json({ success: false, error: error.issues[0].message });
+    }
+    sendServerError(res, error, 'List courses error');
   }
 }
 
@@ -19,7 +23,7 @@ async function getCourse(req, res) {
     }
     res.json({ success: true, data: course });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    sendServerError(res, error, 'Get course error');
   }
 }
 

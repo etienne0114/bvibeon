@@ -1,5 +1,11 @@
 const progressService = require('../services/progressService');
 const { progressSchema } = require('../models/schemas');
+const { sendServerError } = require('../utils/errors');
+
+// Our own `throw new Error('Course not found')`-style messages are safe to
+// show as-is; anything carrying Prisma's `clientVersion` is a driver/DB
+// error whose raw text (hostnames, internals) must never reach the client.
+const isAppError = (error) => !error?.clientVersion;
 
 async function enroll(req, res) {
   try {
@@ -7,7 +13,10 @@ async function enroll(req, res) {
     const enrollment = await progressService.enrollInCourse(req.user.id, courseId);
     res.status(201).json({ success: true, data: enrollment });
   } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
+    if (isAppError(error)) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+    sendServerError(res, error, 'Enroll error');
   }
 }
 
@@ -17,7 +26,10 @@ async function track(req, res) {
     const progress = await progressService.trackLessonProgress(req.user.id, payload);
     res.json({ success: true, data: progress });
   } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
+    if (isAppError(error)) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+    sendServerError(res, error, 'Track progress error');
   }
 }
 
@@ -26,7 +38,7 @@ async function getProgress(req, res) {
     const progress = await progressService.getUserProgress(req.user.id);
     res.json({ success: true, data: progress });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    sendServerError(res, error, 'Get progress error');
   }
 }
 

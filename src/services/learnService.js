@@ -1,5 +1,6 @@
 const prisma = require('../utils/prismaClient');
 const logger = require('../utils/logger');
+const { settleWithDefaults } = require('../utils/errors');
 const progressService = require('./progressService');
 const courseService = require('./courseService');
 
@@ -60,32 +61,49 @@ class LearnService {
    */
   async getLearningDashboard(userId) {
     try {
-      const [statsWithActivity, enrollments, goals, achievements] = await Promise.all([
-        progressService.getStatsAndActivity(userId),
-        prisma.courseEnrollment.findMany({
-          where: { userId },
-          include: {
-            course: {
-              select: {
-                id: true,
-                title: true,
-                imageUrl: true,
-                category: true,
-                level: true,
-                estimatedDuration: true,
-                _count: { select: { lessons: { where: { status: 'PUBLISHED' } } } },
+      // Each piece is independent: a blip in one (e.g. achievements) must
+      // never take down the whole dashboard when the others succeeded.
+      const emptyStats = {
+        overall: { totalLessons: 0, completedLessons: 0, completionRate: 0, totalTimeMinutes: 0, streakDays: 0 },
+        courses: { enrolled: 0, completed: 0 },
+        quizzes: { totalAttempts: 0 },
+        weeklyActivity: [],
+      };
+      const { statsWithActivity, enrollments, goals, achievements, hadFailure } = await settleWithDefaults([
+        { key: 'statsWithActivity', label: 'Dashboard stats', fallback: emptyStats, task: () => progressService.getStatsAndActivity(userId) },
+        {
+          key: 'enrollments',
+          label: 'Dashboard enrollments',
+          fallback: [],
+          task: () =>
+            prisma.courseEnrollment.findMany({
+              where: { userId },
+              include: {
+                course: {
+                  select: {
+                    id: true,
+                    title: true,
+                    imageUrl: true,
+                    category: true,
+                    level: true,
+                    estimatedDuration: true,
+                    _count: { select: { lessons: { where: { status: 'PUBLISHED' } } } },
+                  },
+                },
               },
-            },
-          },
-          orderBy: { updatedAt: 'desc' },
-          take: 5,
-        }),
-        progressService.getGoals(userId),
-        progressService.getRecentAchievements(userId, 4),
+              orderBy: { updatedAt: 'desc' },
+              take: 5,
+            }),
+        },
+        { key: 'goals', label: 'Dashboard goals', fallback: { goals: [], timeframe: 'monthly' }, task: () => progressService.getGoals(userId) },
+        { key: 'achievements', label: 'Dashboard achievements', fallback: [], task: () => progressService.getRecentAchievements(userId, 4) },
       ]);
       const { weeklyActivity, ...stats } = statsWithActivity;
 
-      const continueLearning = await this.getContinueLearning(userId, enrollments);
+      const continueLearning = await this.getContinueLearning(userId, enrollments).catch((error) => {
+        logger.error('Continue-learning lookup failed, using null:', error);
+        return null;
+      });
 
       return {
         summary: {
@@ -110,6 +128,7 @@ class LearnService {
         weeklyActivity,
         achievements,
         learningGoals: goals,
+        partial: Boolean(hadFailure || stats.hadError),
         generatedAt: new Date().toISOString(),
       };
     } catch (error) {
@@ -162,19 +181,29 @@ class LearnService {
 
   async getLearningAnalytics(userId) {
     try {
-      const [stats, enrollments] = await Promise.all([
-        progressService.getStatsAndActivity(userId),
-        prisma.courseEnrollment.findMany({
-          where: { userId },
-          select: { progress: true }
-        })
+      const emptyStats = {
+        overall: { totalLessons: 0, completedLessons: 0, completionRate: 0, totalTimeMinutes: 0, streakDays: 0 },
+        courses: { enrolled: 0, completed: 0 },
+        quizzes: { totalAttempts: 0 },
+        weeklyActivity: [],
+      };
+      const { stats, enrollments } = await settleWithDefaults([
+        { key: 'stats', label: 'Analytics stats', fallback: emptyStats, task: () => progressService.getStatsAndActivity(userId) },
+        {
+          key: 'enrollments',
+          label: 'Analytics enrollments',
+          fallback: [],
+          task: () => prisma.courseEnrollment.findMany({ where: { userId }, select: { progress: true } }),
+        },
       ]);
 
       const avgProgress = enrollments.length > 0 
         ? enrollments.reduce((acc, curr) => acc + curr.progress, 0) / enrollments.length 
         : 0;
 
-      const quizAgg = await prisma.quizAttempt.aggregate({ where: { userId }, _avg: { score: true } });
+      const quizAgg = await prisma.quizAttempt
+        .aggregate({ where: { userId }, _avg: { score: true } })
+        .catch(() => ({ _avg: { score: 0 } }));
       const weeklyActivity = stats.weeklyActivity;
       const activeDays = weeklyActivity.filter((d) => d.lessons > 0).length;
       const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];

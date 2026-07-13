@@ -19,6 +19,18 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('combined', { stream: logger.stream }));
 
+// Safety net: if something upstream (DB, a slow dependency) hangs instead of
+// erroring, cut the request loose after 20s with a clean, retryable response
+// rather than leaving the client's request pending indefinitely.
+app.use((req, res, next) => {
+  req.setTimeout(20000, () => {
+    if (!res.headersSent) {
+      res.status(503).json({ success: false, error: 'The request took too long. Please try again.', retryable: true });
+    }
+  });
+  next();
+});
+
 // Broad safety-net limit per IP; auth routes carry their own tighter limits
 app.use(
   '/api',

@@ -60,8 +60,8 @@ class LearnService {
    */
   async getLearningDashboard(userId) {
     try {
-      const [stats, enrollments, activity, goals, weeklyActivity, achievements] = await Promise.all([
-        progressService.getLearningStats(userId),
+      const [statsWithActivity, enrollments, goals, achievements] = await Promise.all([
+        progressService.getStatsAndActivity(userId),
         prisma.courseEnrollment.findMany({
           where: { userId },
           include: {
@@ -80,11 +80,10 @@ class LearnService {
           orderBy: { updatedAt: 'desc' },
           take: 5,
         }),
-        this.getRecentActivity(userId),
         progressService.getGoals(userId),
-        progressService.getWeeklyActivity(userId),
         progressService.getRecentAchievements(userId, 4),
       ]);
+      const { weeklyActivity, ...stats } = statsWithActivity;
 
       const continueLearning = await this.getContinueLearning(userId, enrollments);
 
@@ -110,7 +109,6 @@ class LearnService {
         continueLearning,
         weeklyActivity,
         achievements,
-        recentActivity: activity,
         learningGoals: goals,
         generatedAt: new Date().toISOString(),
       };
@@ -165,7 +163,7 @@ class LearnService {
   async getLearningAnalytics(userId) {
     try {
       const [stats, enrollments] = await Promise.all([
-        progressService.getLearningStats(userId),
+        progressService.getStatsAndActivity(userId),
         prisma.courseEnrollment.findMany({
           where: { userId },
           select: { progress: true }
@@ -176,10 +174,8 @@ class LearnService {
         ? enrollments.reduce((acc, curr) => acc + curr.progress, 0) / enrollments.length 
         : 0;
 
-      const [quizAgg, weeklyActivity] = await Promise.all([
-        prisma.quizAttempt.aggregate({ where: { userId }, _avg: { score: true } }),
-        progressService.getWeeklyActivity(userId),
-      ]);
+      const quizAgg = await prisma.quizAttempt.aggregate({ where: { userId }, _avg: { score: true } });
+      const weeklyActivity = stats.weeklyActivity;
       const activeDays = weeklyActivity.filter((d) => d.lessons > 0).length;
       const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 

@@ -140,51 +140,78 @@ class ProgressService {
   }
 
   /**
+   * All headline stats in ONE database round-trip, plus daily activity in a
+   * second — the dashboard used to issue ~14 queries which serialize behind
+   * the connection pool.
+   */
+  async getStatsAndActivity(userId) {
+    const [statsRows, activityRows] = await Promise.all([
+      prisma.$queryRaw`
+        SELECT
+          (SELECT COUNT(*) FROM "LessonProgress" WHERE "userId" = ${userId})::int AS total_lessons,
+          (SELECT COUNT(*) FROM "LessonProgress" WHERE "userId" = ${userId} AND status = 'COMPLETED')::int AS completed_lessons,
+          (SELECT COALESCE(SUM("timeSpentMinutes"), 0) FROM "LessonProgress" WHERE "userId" = ${userId})::int AS total_time,
+          (SELECT COUNT(*) FROM "QuizAttempt" WHERE "userId" = ${userId})::int AS quiz_attempts,
+          (SELECT COUNT(*) FROM "CourseEnrollment" WHERE "userId" = ${userId})::int AS enrolled,
+          (SELECT COUNT(*) FROM "CourseEnrollment" WHERE "userId" = ${userId} AND "isCompleted" = true)::int AS completed_courses
+      `,
+      prisma.$queryRaw`
+        SELECT DATE("lastAccessedAt") AS day,
+               COALESCE(SUM("timeSpentMinutes"), 0)::int AS minutes,
+               COUNT(*)::int AS lessons
+        FROM "LessonProgress"
+        WHERE "userId" = ${userId}
+          AND "lastAccessedAt" >= NOW() - INTERVAL '366 days'
+        GROUP BY 1
+      `,
+    ]);
+    const raw = statsRows[0] || {};
+    const byDay = new Map(
+      activityRows.map((r) => [new Date(r.day).toISOString().slice(0, 10), { minutes: r.minutes, lessons: r.lessons }]),
+    );
+
+    // streak: consecutive days ending today or yesterday
+    let streak = 0;
+    {
+      const cursor = new Date();
+      if (!byDay.has(cursor.toISOString().slice(0, 10))) cursor.setDate(cursor.getDate() - 1);
+      while (byDay.has(cursor.toISOString().slice(0, 10))) {
+        streak += 1;
+        cursor.setDate(cursor.getDate() - 1);
+      }
+    }
+
+    // last 7 days, zero-filled
+    const weeklyActivity = [];
+    for (let i = 6; i >= 0; i -= 1) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      weeklyActivity.push({ date: key, ...(byDay.get(key) || { minutes: 0, lessons: 0 }) });
+    }
+
+    const totalLessons = raw.total_lessons || 0;
+    const completedLessons = raw.completed_lessons || 0;
+    return {
+      overall: {
+        totalLessons,
+        completedLessons,
+        completionRate: totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0,
+        totalTimeMinutes: raw.total_time || 0,
+        streakDays: streak,
+      },
+      courses: { enrolled: raw.enrolled || 0, completed: raw.completed_courses || 0 },
+      quizzes: { totalAttempts: raw.quiz_attempts || 0 },
+      weeklyActivity,
+    };
+  }
+
+  /**
    * Get user learning statistics
    */
   async getLearningStats(userId) {
-    try {
-      const [
-        totalLessons,
-        completedLessons,
-        totalQuizAttempts,
-        totalTime,
-        enrolledCourses,
-        completedCourses,
-      ] = await Promise.all([
-        prisma.lessonProgress.count({ where: { userId } }),
-        prisma.lessonProgress.count({ where: { userId, status: 'COMPLETED' } }),
-        prisma.quizAttempt.count({ where: { userId } }),
-        prisma.lessonProgress.aggregate({
-          where: { userId },
-          _sum: { timeSpentMinutes: true },
-        }),
-        prisma.courseEnrollment.count({ where: { userId } }),
-        prisma.courseEnrollment.count({ where: { userId, isCompleted: true } }),
-      ]);
-
-      const streak = await this.calculateStreak(userId);
-
-      return {
-        overall: {
-          totalLessons,
-          completedLessons,
-          completionRate: totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0,
-          totalTimeMinutes: totalTime._sum.timeSpentMinutes || 0,
-          streakDays: streak,
-        },
-        courses: {
-          enrolled: enrolledCourses,
-          completed: completedCourses,
-        },
-        quizzes: {
-          totalAttempts: totalQuizAttempts,
-        },
-      };
-    } catch (error) {
-      logger.error('Get learning stats error:', error);
-      throw error;
-    }
+    const { weeklyActivity, ...stats } = await this.getStatsAndActivity(userId);
+    return stats;
   }
 
   /**

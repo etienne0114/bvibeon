@@ -521,9 +521,15 @@ class TranslatorIntegrationService {
       
       let audioFormat = 'wav';
       let contentType = 'audio/wav';
-      
+
       const header4 = audioBuffer.subarray(0, 4);
-      if (header4.toString() === 'OggS') {
+      // Browsers' MediaRecorder defaults to audio/webm — without this check
+      // every browser recording was mislabeled as wav and sent to the STT
+      // service with the wrong content-type, which silently degrades or
+      // fails transcription.
+      if (header4[0] === 0x1a && header4[1] === 0x45 && header4[2] === 0xdf && header4[3] === 0xa3) {
+        audioFormat = 'webm'; contentType = 'audio/webm';
+      } else if (header4.toString() === 'OggS') {
         audioFormat = 'ogg'; contentType = 'audio/ogg';
       } else if (header4.toString() === 'fLaC') {
         audioFormat = 'flac'; contentType = 'audio/flac';

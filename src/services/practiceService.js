@@ -9,7 +9,7 @@ const logger = require('../utils/logger');
 const deepseekHelper = require('./ai/deepseek_helper');
 const aiTutorService = require('./ai/aiTutorService');
 const dictionaryService = require('./dictionaryService');
-const pronunciationAssessmentService = require('./pronunciationAssessmentService');
+const translatorIntegrationService = require('./translator/translatorIntegrationService');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SM-2 Spaced Repetition
@@ -292,6 +292,18 @@ async function getVocabularyStats(userId) {
   return { totalWords: total, mastered, learning, accuracy, currentStreak };
 }
 
+async function transcribeVoiceMessage(audioBuffer, language) {
+  const audioBase64 = audioBuffer.toString('base64');
+  const result = await translatorIntegrationService.transcribeAudioFromBase64(audioBase64, language, false);
+  if (!result?.success || !result?.data?.text?.trim()) {
+    throw new Error('Could not understand the audio. Please try speaking again.');
+  }
+  return {
+    transcribedText: result.data.text.trim(),
+    confidence: Math.round((result.data.confidence || 0) * 100),
+  };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ROLEPLAY
 // ─────────────────────────────────────────────────────────────────────────────
@@ -346,18 +358,15 @@ async function sendRoleplayMessage(userId, sessionId, userMessage, language = 'e
   if (session.userId !== userId) throw new Error('Unauthorized');
 
   let processedMessage = userMessage;
-  let pronunciationScore = null;
+  let confidence = null;
 
-  // If audio is provided, assess pronunciation and use transcribed text
+  // Voice message: transcribe it and use the transcript as the chat turn.
+  // (There's no "expected text" in free conversation to score pronunciation
+  // against — that scoring path is for dedicated pronunciation drills.)
   if (audioBuffer) {
-    const assessment = await pronunciationAssessmentService.assessPronunciation(
-      userId, 
-      userMessage, // Expected text if user followed a prompt, or just use as reference
-      language, 
-      audioBuffer
-    );
-    processedMessage = assessment.transcribedText;
-    pronunciationScore = assessment.overallScore;
+    const transcription = await transcribeVoiceMessage(audioBuffer, language);
+    processedMessage = transcription.transcribedText;
+    confidence = transcription.confidence;
   }
 
   const characterRole = session.scenario.category || 'a character';
@@ -385,7 +394,7 @@ async function sendRoleplayMessage(userId, sessionId, userMessage, language = 'e
     reply: aiResult.text, 
     grammarErrors: aiResult.grammarErrors,
     nativeSpeakerVersion: aiResult.nativeSpeakerVersion,
-    pronunciationScore,
+    confidence,
     transcribedText: audioBuffer ? processedMessage : null
   };
 }
@@ -597,17 +606,12 @@ async function sendTechnologyMessage(userId, sessionId, userMessage, language = 
   if (!session || session.userId !== userId) throw new Error('Session not found');
 
   let processedMessage = userMessage;
-  let pronunciationScore = null;
+  let confidence = null;
 
   if (audioBuffer) {
-    const assessment = await pronunciationAssessmentService.assessPronunciation(
-      userId,
-      userMessage,
-      session.language || 'en',
-      audioBuffer
-    );
-    processedMessage = assessment.transcribedText;
-    pronunciationScore = assessment.overallScore;
+    const transcription = await transcribeVoiceMessage(audioBuffer, session.language || 'en');
+    processedMessage = transcription.transcribedText;
+    confidence = transcription.confidence;
   }
 
   const techContext = `You are a technology educator. The topic is "${session.topic?.title || 'Technology'}". ${session.topic?.description || ''}`;
@@ -633,7 +637,7 @@ async function sendTechnologyMessage(userId, sessionId, userMessage, language = 
     reply: aiResult.text, 
     grammarErrors: aiResult.grammarErrors,
     nativeSpeakerVersion: aiResult.nativeSpeakerVersion,
-    pronunciationScore,
+    confidence,
     transcribedText: audioBuffer ? processedMessage : null
   };
 }

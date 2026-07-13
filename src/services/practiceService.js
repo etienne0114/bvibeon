@@ -294,7 +294,15 @@ async function getVocabularyStats(userId) {
 
 async function transcribeVoiceMessage(audioBuffer, language) {
   const audioBase64 = audioBuffer.toString('base64');
-  const result = await translatorIntegrationService.transcribeAudioFromBase64(audioBase64, language, false);
+  let result;
+  try {
+    result = await translatorIntegrationService.transcribeAudioFromBase64(audioBase64, language, false);
+  } catch (error) {
+    // The STT client can reject (not just resolve with success:false) —
+    // normalize both failure shapes to the same clean, user-facing message.
+    logger.warn(`Voice transcription request failed: ${error.message}`);
+    throw new Error('Could not understand the audio. Please try speaking again.');
+  }
   if (!result?.success || !result?.data?.text?.trim()) {
     throw new Error('Could not understand the audio. Please try speaking again.');
   }

@@ -63,31 +63,35 @@ const VOCAB_SEED = [
   { word: 'pragmatic',   language: 'en', definition: 'Dealing with things practically rather than theoretically', partOfSpeech: 'adjective', difficulty: 2, tags: 'common,english' },
 ];
 
+// Seeding runs at most once per server lifetime — previously this ran on
+// every single practice API call (4 hot endpoints x ~28 upserts each),
+// adding real, avoidable latency to every request.
+let seedPromise = null;
+
 async function ensureSeedData() {
-  // Seed roleplay scenarios
-  for (const s of ROLEPLAY_SEED) {
-    await prisma.rolePlayScenario.upsert({
-      where: { id: s.id },
-      update: {},
-      create: s,
+  if (!seedPromise) {
+    seedPromise = (async () => {
+      await Promise.all([
+        ...ROLEPLAY_SEED.map((s) => prisma.rolePlayScenario.upsert({ where: { id: s.id }, update: {}, create: s })),
+        ...TECH_SEED.map((t) => prisma.technologyTopic.upsert({ where: { id: t.id }, update: {}, create: t })),
+        // VocabularyItem has no unique constraint on (word, language), so
+        // this can't be a real .upsert() — check-then-create instead. (The
+        // previous code called upsert with a compound key that doesn't
+        // exist on this model, which threw a Prisma validation error on
+        // every single word, on every server start.)
+        ...VOCAB_SEED.map(async (v) => {
+          const existing = await prisma.vocabularyItem.findFirst({ where: { word: v.word, language: v.language } });
+          if (!existing) {
+            await prisma.vocabularyItem.create({ data: v }).catch(() => {});
+          }
+        }),
+      ]);
+    })().catch((error) => {
+      seedPromise = null; // allow retry on the next call if seeding failed
+      throw error;
     });
   }
-  // Seed technology topics
-  for (const t of TECH_SEED) {
-    await prisma.technologyTopic.upsert({
-      where: { id: t.id },
-      update: {},
-      create: t,
-    });
-  }
-  // Seed vocabulary items
-  for (const v of VOCAB_SEED) {
-    await prisma.vocabularyItem.upsert({
-      where: { word_language: { word: v.word, language: v.language } },
-      update: {},
-      create: v,
-    }).catch(() => {}); // ignore unique constraint if schema differs
-  }
+  return seedPromise;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -110,52 +114,66 @@ async function getDailyVocabulary(userId, language = 'en') {
     orderBy: { nextReviewAt: 'asc' },
   });
 
-  // If nothing due, pick a random word from dictionary service (REAL data)
-  if (!progress) {
-    const freshBatch = await dictionaryService.getRandomVocabularyBatch(1, language, userId);
-    if (freshBatch.length > 0) {
-      const item = freshBatch[0];
-      // Upsert into VocabularyItem
-      const dbItem = await prisma.vocabularyItem.upsert({
-        where: { id: item.id },
-        update: {},
-        create: {
-          id: item.id,
-          word: item.word,
-          language: item.language,
-          definition: item.definition,
-          partOfSpeech: item.partOfSpeech,
-          difficulty: item.difficulty || 1,
-        }
-      }).catch(async () => {
-         return await prisma.vocabularyItem.findFirst({ where: { word: item.word, language: item.language } });
-      });
-
-      if (dbItem) {
-        progress = { vocabularyItem: dbItem, masteryLevel: 0, streak: 0, nextReviewAt: null };
-      }
-    }
+  if (progress) {
+    // Already-tracked word: the local record only has the bare
+    // word/definition, so enrich it with phonetic/examples/synonyms.
+    const item = progress.vocabularyItem;
+    const def = await dictionaryService.getWordDefinition(item.word, item.language);
+    return {
+      vocabularyItemId: item.id,
+      word: item.word,
+      definition: def?.meanings?.[0]?.definitions?.[0]?.definition || item.definition || '',
+      partOfSpeech: def?.meanings?.[0]?.partOfSpeech || item.partOfSpeech || 'noun',
+      difficulty: item.difficulty || 1,
+      language: item.language,
+      phonetic: def?.phonetic || '',
+      audio: def?.audio || '',
+      examples: dictionaryService.extractExamples(def || {}),
+      synonyms: dictionaryService.extractSynonyms(def || {}),
+      masteryLevel: progress.masteryLevel || 0,
+      streak: progress.streak || 0,
+      nextReviewAt: progress.nextReviewAt || null,
+    };
   }
 
-  if (!progress) return null;
+  // Nothing due: pick a fresh word. getRandomVocabularyBatch already returns
+  // it fully enriched (definition/phonetic/examples/synonyms) — no second
+  // lookup needed, unlike before.
+  const freshBatch = await dictionaryService.getRandomVocabularyBatch(1, language, userId);
+  if (freshBatch.length === 0) return null;
+  const item = freshBatch[0];
 
-  const item = progress.vocabularyItem;
-  const def = await dictionaryService.getWordDefinition(item.word, item.language);
+  // Persist in the background so future spaced-repetition tracking has a
+  // row to attach to — the response doesn't need to wait on this write.
+  prisma.vocabularyItem
+    .upsert({
+      where: { id: item.id },
+      update: {},
+      create: {
+        id: item.id,
+        word: item.word,
+        language: item.language,
+        definition: item.definition,
+        partOfSpeech: item.partOfSpeech,
+        difficulty: item.difficulty || 1,
+      },
+    })
+    .catch(() => {});
 
   return {
     vocabularyItemId: item.id,
     word: item.word,
-    definition: def?.meanings?.[0]?.definitions?.[0]?.definition || item.definition || '',
-    partOfSpeech: def?.meanings?.[0]?.partOfSpeech || item.partOfSpeech || 'noun',
+    definition: item.definition || '',
+    partOfSpeech: item.partOfSpeech || 'noun',
     difficulty: item.difficulty || 1,
     language: item.language,
-    phonetic: def?.phonetic || '',
-    audio: def?.audio || '',
-    examples: dictionaryService.extractExamples(def || {}),
-    synonyms: dictionaryService.extractSynonyms(def || {}),
-    masteryLevel: progress.masteryLevel || 0,
-    streak: progress.streak || 0,
-    nextReviewAt: progress.nextReviewAt || null,
+    phonetic: item.phonetic || '',
+    audio: item.audio || '',
+    examples: item.examples || [],
+    synonyms: item.synonyms || [],
+    masteryLevel: 0,
+    streak: 0,
+    nextReviewAt: null,
   };
 }
 
@@ -175,46 +193,48 @@ async function getSpacedRepetitionQueue(userId, language = 'en', limit = 12) {
     take: limit,
   });
 
+  // Fresh words already arrive fully enriched (definition/phonetic/examples)
+  // from getRandomVocabularyBatch — no need to look them up again.
+  let freshEntries = [];
   if (due.length < limit) {
     const remaining = limit - due.length;
     const freshWords = await dictionaryService.getRandomVocabularyBatch(remaining, language, userId);
-    
-    for (const fw of freshWords) {
-      due.push({
-        vocabularyItem: {
-          id: fw.id,
-          word: fw.word,
-          language: fw.language,
-          definition: fw.definition,
-          partOfSpeech: fw.partOfSpeech,
-          difficulty: fw.difficulty || 1,
-        },
-        masteryLevel: 0,
-        streak: 0,
-        vocabularyItemId: fw.id,
-        isNew: true
-      });
-    }
+    freshEntries = freshWords.map((fw) => ({
+      vocabularyItemId: fw.id,
+      word: fw.word,
+      definition: fw.definition || '',
+      partOfSpeech: fw.partOfSpeech || 'noun',
+      phonetic: fw.phonetic || '',
+      difficulty: fw.difficulty || 1,
+      language: fw.language,
+      masteryLevel: 0,
+      streak: 0,
+      isNew: true,
+    }));
   }
 
-  const results = [];
-  for (const p of due) {
-    const lookup = await dictionaryService.getWordDefinition(p.vocabularyItem.word, p.vocabularyItem.language);
-    results.push({
-      vocabularyItemId: p.vocabularyItemId || p.vocabularyItem.id,
-      word: p.vocabularyItem.word,
-      definition: lookup?.meanings?.[0]?.definitions?.[0]?.definition || p.vocabularyItem.definition || '',
-      partOfSpeech: lookup?.meanings?.[0]?.partOfSpeech || p.vocabularyItem.partOfSpeech || 'noun',
-      phonetic: lookup?.phonetic || '',
-      difficulty: p.vocabularyItem.difficulty || 1,
-      language: p.vocabularyItem.language,
-      masteryLevel: p.masteryLevel || 0,
-      streak: p.streak || 0,
-      isNew: p.isNew || false,
-    });
-  }
+  // Only the already-tracked words need an enrichment lookup, and it runs in
+  // parallel instead of one-at-a-time — previously up to `limit` sequential
+  // lookups (each possibly hitting a slow external dictionary API).
+  const enrichedDue = await Promise.all(
+    due.map(async (p) => {
+      const lookup = await dictionaryService.getWordDefinition(p.vocabularyItem.word, p.vocabularyItem.language);
+      return {
+        vocabularyItemId: p.vocabularyItemId || p.vocabularyItem.id,
+        word: p.vocabularyItem.word,
+        definition: lookup?.meanings?.[0]?.definitions?.[0]?.definition || p.vocabularyItem.definition || '',
+        partOfSpeech: lookup?.meanings?.[0]?.partOfSpeech || p.vocabularyItem.partOfSpeech || 'noun',
+        phonetic: lookup?.phonetic || '',
+        difficulty: p.vocabularyItem.difficulty || 1,
+        language: p.vocabularyItem.language,
+        masteryLevel: p.masteryLevel || 0,
+        streak: p.streak || 0,
+        isNew: false,
+      };
+    }),
+  );
 
-  return results;
+  return [...enrichedDue, ...freshEntries];
 }
 
 async function markVocabularyResult(userId, vocabularyItemId, correct) {
@@ -547,7 +567,7 @@ async function startTechnologySession(userId, topicId, language = 'en') {
   if (!topic) throw new Error('Technology topic not found');
 
   const session = await prisma.learningSession.create({
-    data: { userId, type: 'CONVERSATION', language, status: 'ACTIVE' },
+    data: { userId, topicId, type: 'CONVERSATION', language, status: 'ACTIVE' },
   });
 
   const techContext = `You are an expert technology educator teaching "${topic.title}". ${topic.description}`;
@@ -659,18 +679,32 @@ const ACHIEVEMENT_RULES = [
 ];
 
 async function checkAndGrantAchievements(userId) {
-  for (const rule of ACHIEVEMENT_RULES) {
-    try {
-      const alreadyHas = await prisma.achievement.findFirst({ where: { userId, type: rule.type } });
-      if (alreadyHas) continue;
-      const earned = await rule.check(userId);
-      if (earned) {
-        await prisma.achievement.create({
-          data: { userId, title: rule.title, description: rule.description, type: rule.type, xpReward: rule.xpReward, unlockedAt: new Date() },
-        });
-        logger.info(`Achievement unlocked for ${userId}: ${rule.type}`);
-      }
-    } catch { /* non-blocking */ }
+  // One query for everything already unlocked, then only the still-locked
+  // rules run their `.check()` — all in parallel instead of serially
+  // awaiting up to 18 round trips (findFirst + check) one at a time.
+  const existing = await prisma.achievement.findMany({ where: { userId }, select: { type: true } });
+  const unlockedTypes = new Set(existing.map((a) => a.type));
+  const candidates = ACHIEVEMENT_RULES.filter((rule) => !unlockedTypes.has(rule.type));
+  if (candidates.length === 0) return;
+
+  const results = await Promise.allSettled(candidates.map((rule) => rule.check(userId)));
+  const toCreate = candidates
+    .filter((_, i) => results[i].status === 'fulfilled' && results[i].value)
+    .map((rule) => ({
+      userId,
+      title: rule.title,
+      description: rule.description,
+      type: rule.type,
+      xpReward: rule.xpReward,
+      unlockedAt: new Date(),
+    }));
+  if (toCreate.length === 0) return;
+
+  try {
+    await prisma.achievement.createMany({ data: toCreate, skipDuplicates: true });
+    toCreate.forEach((a) => logger.info(`Achievement unlocked for ${userId}: ${a.type}`));
+  } catch (error) {
+    logger.warn('Grant achievements error:', error.message);
   }
 }
 

@@ -1,4 +1,5 @@
 const practiceService = require('../services/practiceService');
+const { sendServerError } = require('../utils/errors');
 
 async function getDailyVocabulary(req, res) {
   try {
@@ -6,7 +7,7 @@ async function getDailyVocabulary(req, res) {
     const entry = await practiceService.getDailyVocabulary(req.user.id, language);
     res.json({ success: true, data: entry });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    sendServerError(res, error, 'Get daily vocabulary error');
   }
 }
 
@@ -17,7 +18,7 @@ async function getVocabularyQueue(req, res) {
     const queue = await practiceService.getSpacedRepetitionQueue(req.user.id, language, limit);
     res.json({ success: true, data: queue });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    sendServerError(res, error, 'Get vocabulary queue error');
   }
 }
 
@@ -30,7 +31,7 @@ async function markVocabularyResult(req, res) {
     const result = await practiceService.markVocabularyResult(req.user.id, vocabularyItemId, correct);
     res.json({ success: true, data: result });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    sendServerError(res, error, 'Mark vocabulary result error');
   }
 }
 
@@ -39,7 +40,7 @@ async function getVocabularyStats(req, res) {
     const stats = await practiceService.getVocabularyStats(req.user.id);
     res.json({ success: true, data: stats });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    sendServerError(res, error, 'Get vocabulary stats error');
   }
 }
 
@@ -49,7 +50,7 @@ async function getRoleplayScenarios(req, res) {
     const scenarios = await practiceService.getRoleplayScenarios(category);
     res.json({ success: true, data: scenarios });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    sendServerError(res, error, 'Get roleplay scenarios error');
   }
 }
 
@@ -62,7 +63,7 @@ async function startRoleplaySession(req, res) {
     const session = await practiceService.startRoleplaySession(req.user.id, scenarioId, language);
     res.status(201).json({ success: true, data: session });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    sendServerError(res, error, 'Start roleplay session error');
   }
 }
 
@@ -81,7 +82,7 @@ async function sendRoleplayMessage(req, res) {
     const reply = await practiceService.sendRoleplayMessage(req.user.id, sessionId, message, language, audioBuffer);
     res.json({ success: true, data: reply });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    sendServerError(res, error, 'Send roleplay message error');
   }
 }
 
@@ -94,7 +95,7 @@ async function completeRoleplaySession(req, res) {
     const result = await practiceService.completeRoleplaySession(req.user.id, sessionId);
     res.json({ success: true, data: result });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    sendServerError(res, error, 'Complete roleplay session error');
   }
 }
 
@@ -107,7 +108,7 @@ async function generateQuiz(req, res) {
     const quiz = await practiceService.generateQuiz(req.user.id, topic, language, count || 5);
     res.json({ success: true, data: quiz });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    sendServerError(res, error, 'Generate quiz error');
   }
 }
 
@@ -120,7 +121,7 @@ async function submitQuizAnswer(req, res) {
     const result = await practiceService.submitQuizAnswer(req.user.id, quizId, answers);
     res.json({ success: true, data: result });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    sendServerError(res, error, 'Submit quiz answer error');
   }
 }
 
@@ -130,7 +131,7 @@ async function getQuizHistory(req, res) {
     const history = await practiceService.getQuizHistory(req.user.id, limit);
     res.json({ success: true, data: history });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    sendServerError(res, error, 'Get quiz history error');
   }
 }
 
@@ -140,7 +141,7 @@ async function getTechnologyTopics(req, res) {
     const topics = await practiceService.getTechnologyTopics(category);
     res.json({ success: true, data: topics });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    sendServerError(res, error, 'Get technology topics error');
   }
 }
 
@@ -153,7 +154,7 @@ async function startTechnologySession(req, res) {
     const session = await practiceService.startTechnologySession(req.user.id, topicId, language);
     res.status(201).json({ success: true, data: session });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    sendServerError(res, error, 'Start technology session error');
   }
 }
 
@@ -172,7 +173,7 @@ async function sendTechnologyMessage(req, res) {
     const reply = await practiceService.sendTechnologyMessage(req.user.id, sessionId, message, language, audioBuffer);
     res.json({ success: true, data: reply });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    sendServerError(res, error, 'Send technology message error');
   }
 }
 
@@ -185,7 +186,7 @@ async function completeTechnologySession(req, res) {
     const result = await practiceService.completeTechnologySession(req.user.id, sessionId);
     res.json({ success: true, data: result });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    sendServerError(res, error, 'Complete technology session error');
   }
 }
 
@@ -194,7 +195,7 @@ async function getAchievements(req, res) {
     const achievements = await practiceService.getAchievements(req.user.id);
     res.json({ success: true, data: achievements });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    sendServerError(res, error, 'Get achievements error');
   }
 }
 

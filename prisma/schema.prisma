@@ -201,6 +201,7 @@ model DictionaryLookup {
   updatedAt     DateTime @updatedAt
 
   @@unique([word, language])
+  @@index([language, accessedCount])
 }
 
 model VocabularyItem {
@@ -251,6 +252,8 @@ model RolePlayScenario {
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
   sessions     LearningSession[]
+
+  @@index([category])
 }
 
 model TechnologyTopic {
@@ -264,12 +267,16 @@ model TechnologyTopic {
   isPremium   Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  sessions    LearningSession[]
+
+  @@index([category])
 }
 
 model LearningSession {
   id          String                @id @default(uuid())
   userId      String
   scenarioId  String?
+  topicId     String?
   type        String                @default("CONVERSATION") // CONVERSATION, ROLEPLAY, TUTOR
   language    String                @default("en")
   status      String                @default("ACTIVE") // ACTIVE, COMPLETED, CANCELLED
@@ -279,9 +286,11 @@ model LearningSession {
   completedAt DateTime?
   user        User                  @relation(fields: [userId], references: [id])
   scenario    RolePlayScenario?     @relation(fields: [scenarioId], references: [id])
+  topic       TechnologyTopic?      @relation(fields: [topicId], references: [id])
   interactions LearningInteraction[]
 
   @@index([userId, startedAt(sort: Desc)])
+  @@index([topicId])
 }
 
 model LearningInteraction {

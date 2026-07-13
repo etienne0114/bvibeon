@@ -17,7 +17,6 @@ class DictionaryService {
       datamuseSuggest: 'https://api.datamuse.com/sug',
       randomWord: 'https://random-word-api.herokuapp.com/word',
       wiktionary: 'https://en.wiktionary.org/w/api.php',
-      urbanDict: 'https://api.urbandictionary.com/v0/define',
     };
     
     this._recentWords = new Set();
@@ -213,13 +212,15 @@ class DictionaryService {
     const fallbacks = [
       { name: 'datamuse', fn: () => this._getDefinitionFromDatamuse(word) },
       { name: 'wiktionary', fn: () => this._getDefinitionFromWiktionary(word) },
-      { name: 'urban', fn: () => this._getDefinitionFromUrbanDictionary(word) },
     ];
 
     for (const fb of fallbacks) {
       try {
         const def = await fb.fn();
-        if (def && def.meanings?.length > 0) {
+        // Quality gate applies to every source, not just the random-word
+        // generator loop — this is what let one-letter fragments and
+        // fuzzy-match noise into the cache in the first place.
+        if (def && def.meanings?.length > 0 && this.validateWordQuality(word, def)) {
           await this._storeInDatabaseCache({
             ...def,
             language: 'en',
@@ -318,29 +319,10 @@ class DictionaryService {
     };
   }
 
-  async _getDefinitionFromUrbanDictionary(word) {
-    const res = await axios.get(this.apis.urbanDict, { params: { term: word }, timeout: 2500 });
-    const top = res.data?.list?.[0];
-    if (!top) return null;
-
-    return {
-      word,
-      meanings: [{
-        partOfSpeech: 'slang',
-        definitions: [{ 
-          definition: top.definition.replace(/\[|\]/g, ''), 
-          example: top.example ? top.example.replace(/\[|\]/g, '') : '', 
-          synonyms: [], antonyms: [] 
-        }],
-        synonyms: [], antonyms: [],
-      }],
-    };
-  }
-
   async getRandomVocabularyBatch(limit = 10, targetLanguage = 'en', userId = null) {
     const batch = [];
     const seen = new Set();
-    
+
     // Try to get from database first for variety
     try {
       const cached = await this.prisma.dictionaryLookup.findMany({
@@ -369,7 +351,7 @@ class DictionaryService {
       try {
         const word = await this._getValidEnglishWord();
         if (!word || seen.has(word)) continue;
-        
+
         const def = await this.getWordDefinition(word, 'en');
         if (!def || !this.validateWordQuality(word, def)) continue;
 
@@ -423,7 +405,7 @@ class DictionaryService {
   async _getValidEnglishWord() {
     await this._ensureCommonWordsLoaded();
     if (!this._commonWords) return null;
-    
+
     for (let i = 0; i < 10; i++) {
       const w = this._commonWords[Math.floor(Math.random() * this._commonWords.length)];
       if (!this._recentWords.has(w)) {

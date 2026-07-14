@@ -143,25 +143,21 @@ async function getDailyVocabulary(userId, language = 'en') {
   if (freshBatch.length === 0) return null;
   const item = freshBatch[0];
 
-  // Persist in the background so future spaced-repetition tracking has a
-  // row to attach to — the response doesn't need to wait on this write.
-  prisma.vocabularyItem
-    .upsert({
-      where: { id: item.id },
-      update: {},
-      create: {
-        id: item.id,
-        word: item.word,
-        language: item.language,
-        definition: item.definition,
-        partOfSpeech: item.partOfSpeech,
-        difficulty: item.difficulty || 1,
-      },
-    })
-    .catch(() => {});
+  // Must be awaited, not fire-and-forget: the frontend can grade this word
+  // (POST /vocabulary/mark) the instant this response arrives, and grading
+  // looks the id up in vocabularyItem — a request that raced ahead of a
+  // background write would find nothing and fail (see the same bug fixed
+  // in getSpacedRepetitionQueue above).
+  const persisted = await ensureVocabularyItem({
+    word: item.word,
+    language: item.language,
+    definition: item.definition,
+    partOfSpeech: item.partOfSpeech,
+    difficulty: item.difficulty,
+  });
 
   return {
-    vocabularyItemId: item.id,
+    vocabularyItemId: persisted.id,
     word: item.word,
     definition: item.definition || '',
     partOfSpeech: item.partOfSpeech || 'noun',
@@ -175,6 +171,23 @@ async function getDailyVocabulary(userId, language = 'en') {
     streak: 0,
     nextReviewAt: null,
   };
+}
+
+// getRandomVocabularyBatch's "fresh" items carry an id that belongs to a
+// DIFFERENT table (a dictionaryLookup id, or a synthetic `live-word-ts`
+// string for words fetched straight from an external API) — neither one is
+// a row in vocabularyItem. Grading a word later calls
+// vocabularyItem.findUnique({ id: vocabularyItemId }), which found nothing
+// for every single "NEW WORD" in the queue and threw "Vocabulary item not
+// found" (surfaced to the user as "Could not save your answer", 100% of
+// the time, not just a race). Find-or-create the real row up front so the
+// id handed to the frontend is always gradeable.
+async function ensureVocabularyItem({ word, language, definition, partOfSpeech, difficulty }) {
+  const existing = await prisma.vocabularyItem.findFirst({ where: { word, language } });
+  if (existing) return existing;
+  return prisma.vocabularyItem.create({
+    data: { word, language, definition: definition || '', partOfSpeech: partOfSpeech || 'noun', difficulty: difficulty || 1 },
+  });
 }
 
 async function getSpacedRepetitionQueue(userId, language = 'en', limit = 12) {
@@ -194,23 +207,38 @@ async function getSpacedRepetitionQueue(userId, language = 'en', limit = 12) {
   });
 
   // Fresh words already arrive fully enriched (definition/phonetic/examples)
-  // from getRandomVocabularyBatch — no need to look them up again.
+  // from getRandomVocabularyBatch — no need to look them up again, but each
+  // one still needs a real vocabularyItem row before it's gradeable.
   let freshEntries = [];
   if (due.length < limit) {
     const remaining = limit - due.length;
     const freshWords = await dictionaryService.getRandomVocabularyBatch(remaining, language, userId);
-    freshEntries = freshWords.map((fw) => ({
-      vocabularyItemId: fw.id,
-      word: fw.word,
-      definition: fw.definition || '',
-      partOfSpeech: fw.partOfSpeech || 'noun',
-      phonetic: fw.phonetic || '',
-      difficulty: fw.difficulty || 1,
-      language: fw.language,
-      masteryLevel: 0,
-      streak: 0,
-      isNew: true,
-    }));
+    freshEntries = await Promise.all(
+      freshWords.map(async (fw) => {
+        const item = await ensureVocabularyItem({
+          word: fw.word,
+          language: fw.language,
+          definition: fw.definition,
+          partOfSpeech: fw.partOfSpeech,
+          difficulty: fw.difficulty,
+        });
+        return {
+          vocabularyItemId: item.id,
+          word: fw.word,
+          definition: fw.definition || '',
+          partOfSpeech: fw.partOfSpeech || 'noun',
+          phonetic: fw.phonetic || '',
+          difficulty: fw.difficulty || 1,
+          language: fw.language,
+          examples: fw.examples || [],
+          synonyms: fw.synonyms || [],
+          antonyms: fw.antonyms || [],
+          masteryLevel: 0,
+          streak: 0,
+          isNew: true,
+        };
+      }),
+    );
   }
 
   // Only the already-tracked words need an enrichment lookup, and it runs in
@@ -227,6 +255,9 @@ async function getSpacedRepetitionQueue(userId, language = 'en', limit = 12) {
         phonetic: lookup?.phonetic || '',
         difficulty: p.vocabularyItem.difficulty || 1,
         language: p.vocabularyItem.language,
+        examples: lookup ? dictionaryService.extractExamples(lookup) : [],
+        synonyms: lookup ? dictionaryService.extractSynonyms(lookup) : [],
+        antonyms: lookup ? dictionaryService.extractAntonyms(lookup) : [],
         masteryLevel: p.masteryLevel || 0,
         streak: p.streak || 0,
         isNew: false,

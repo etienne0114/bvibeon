@@ -323,20 +323,41 @@ class DictionaryService {
     const batch = [];
     const seen = new Set();
 
+    // Without this, a word the user already graded (mastery raised, next
+    // review pushed days into the future) had no way to be excluded here —
+    // this function only reads the global dictionaryLookup cache, which
+    // knows nothing about per-user progress. The DB-cache branch below
+    // reshuffles a small, mostly-fixed pool ordered by accessedCount, so it
+    // kept resurfacing the same handful of already-seen words as "new" ones
+    // and, because that alone was enough to fill `limit`, the live-fetch
+    // path below (which actually introduces unseen words) never even ran.
+    // That's what "stuck on 8 words that never change" looks like.
+    let excludedWords = new Set();
+    if (userId) {
+      try {
+        const tracked = await this.prisma.vocabularyProgress.findMany({
+          where: { userId, vocabularyItem: { language: targetLanguage } },
+          select: { vocabularyItem: { select: { word: true } } },
+        });
+        excludedWords = new Set(tracked.map((t) => t.vocabularyItem.word.toLowerCase()));
+      } catch (e) {
+        logger.debug(`Could not load tracked words for exclusion: ${e.message}`);
+      }
+    }
+
     // Try to get from database first for variety
     try {
       const cached = await this.prisma.dictionaryLookup.findMany({
         where: { language: targetLanguage, definition: { not: '' } },
         orderBy: { accessedCount: 'asc' },
-        take: limit * 2,
+        take: limit * 4, // wider pool so excluding already-tracked words still leaves enough choice
       });
 
-      if (cached.length > 0) {
-        const shuffled = cached.sort(() => 0.5 - Math.random()).slice(0, limit);
-        for (const c of shuffled) {
-          batch.push(this._formatFromLookup(c));
-          seen.add(c.word.toLowerCase());
-        }
+      const eligible = cached.filter((c) => !excludedWords.has(c.word.toLowerCase()));
+      const shuffled = eligible.sort(() => 0.5 - Math.random()).slice(0, limit);
+      for (const c of shuffled) {
+        batch.push(this._formatFromLookup(c));
+        seen.add(c.word.toLowerCase());
       }
     } catch (e) {
       logger.debug(`DB batch fetch failed: ${e.message}`);
@@ -344,13 +365,16 @@ class DictionaryService {
 
     if (batch.length >= limit) return batch;
 
-    // Fetch real new words if needed
+    // Fetch real new words if needed — this is what actually grows the pool
+    // of distinct words over time instead of only ever reshuffling the seed
+    // set, and it's now reachable whenever the cache can't fill the batch
+    // after exclusions.
     let attempts = 0;
     while (batch.length < limit && attempts < 30) {
       attempts++;
       try {
         const word = await this._getValidEnglishWord();
-        if (!word || seen.has(word)) continue;
+        if (!word || seen.has(word) || excludedWords.has(word)) continue;
 
         const def = await this.getWordDefinition(word, 'en');
         if (!def || !this.validateWordQuality(word, def)) continue;

@@ -71,11 +71,40 @@ async function getCurrentLevel(userId, skill, language) {
   return 'BEGINNER';
 }
 
-async function generateWordsPassage(language) {
+/**
+ * Words this user has already seen in past BEGINNER sessions for this
+ * skill — without this, every new "12 words" batch draws from the same
+ * small dictionaryLookup cache and just reshuffles words already read,
+ * since the cache alone is usually enough to fill 12 and the live-fetch
+ * path (which actually pulls in brand-new dictionary/open-source words)
+ * never gets a chance to run.
+ */
+async function getRecentlyUsedWords(userId, skill, language) {
+  const recent = await prisma.skillSession.findMany({
+    where: { userId, skill, passage: { language, contentType: 'WORDS' } },
+    select: { passage: { select: { content: true } } },
+    orderBy: { createdAt: 'desc' },
+    take: 20,
+  });
+  const words = new Set();
+  for (const r of recent) {
+    try {
+      JSON.parse(r.passage.content).forEach((w) => words.add(String(w).toLowerCase()));
+    } catch {
+      // ignore malformed content from an old row
+    }
+  }
+  return [...words];
+}
+
+async function generateWordsPassage(language, userId, skill) {
   // Reuses the SAME validated word pool Vocabulary practice draws from —
   // no reason to ask an LLM to invent a word list when a real,
-  // quality-gated one already exists.
-  const words = await dictionaryService.getRandomVocabularyBatch(WORDS_PER_SESSION, language, null);
+  // quality-gated one already exists. Excluding this user's own recent
+  // words forces the pool to keep growing via the live-fetch path instead
+  // of cycling the same small cache.
+  const excludeWords = userId ? await getRecentlyUsedWords(userId, skill, language) : [];
+  const words = await dictionaryService.getRandomVocabularyBatch(WORDS_PER_SESSION, language, null, excludeWords);
   const list = words.map((w) => w.word).filter(Boolean);
   return prisma.learningPassage.create({
     data: {
@@ -142,19 +171,22 @@ async function getPassage(userId, skill, language, requestedLevel) {
   });
   const excludeIds = recent.map((r) => r.passageId);
 
-  const existing = await prisma.learningPassage.findMany({
-    where: { language, level, contentType, id: { notIn: excludeIds } },
-    take: 5,
-    orderBy: { createdAt: 'desc' },
-  });
-
   let passage;
-  if (existing.length > 0) {
-    passage = existing[Math.floor(Math.random() * existing.length)];
-  } else if (contentType === 'WORDS') {
-    passage = await generateWordsPassage(language);
+  if (contentType === 'WORDS') {
+    // Cheap to generate (one dictionary-batch query, no AI call), and
+    // reusing an old WORDS passage here would undo the point of the
+    // word-level exclusion above — it could still contain words from a
+    // DIFFERENT passage this same user already read. Always fresh.
+    passage = await generateWordsPassage(language, userId, skill);
   } else {
-    passage = await generateParagraphPassage(language, level);
+    const existing = await prisma.learningPassage.findMany({
+      where: { language, level, contentType, id: { notIn: excludeIds } },
+      take: 5,
+      orderBy: { createdAt: 'desc' },
+    });
+    passage = existing.length > 0
+      ? existing[Math.floor(Math.random() * existing.length)]
+      : await generateParagraphPassage(language, level);
   }
 
   return {

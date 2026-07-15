@@ -343,7 +343,7 @@ class DictionaryService {
     };
   }
 
-  async getRandomVocabularyBatch(limit = 10, targetLanguage = 'en', userId = null) {
+  async getRandomVocabularyBatch(limit = 10, targetLanguage = 'en', userId = null, extraExcludeWords = []) {
     const batch = [];
     const seen = new Set();
 
@@ -356,14 +356,18 @@ class DictionaryService {
     // and, because that alone was enough to fill `limit`, the live-fetch
     // path below (which actually introduces unseen words) never even ran.
     // That's what "stuck on 8 words that never change" looks like.
-    let excludedWords = new Set();
+    // extraExcludeWords lets callers outside Vocabulary (e.g. Reading/
+    // Listening, which track their own session history, not
+    // vocabularyProgress) supply their own "already seen" list so this
+    // shared pool stays fresh for them too.
+    let excludedWords = new Set(extraExcludeWords.map((w) => String(w).toLowerCase()));
     if (userId) {
       try {
         const tracked = await this.prisma.vocabularyProgress.findMany({
           where: { userId, vocabularyItem: { language: targetLanguage } },
           select: { vocabularyItem: { select: { word: true } } },
         });
-        excludedWords = new Set(tracked.map((t) => t.vocabularyItem.word.toLowerCase()));
+        tracked.forEach((t) => excludedWords.add(t.vocabularyItem.word.toLowerCase()));
       } catch (e) {
         logger.debug(`Could not load tracked words for exclusion: ${e.message}`);
       }
@@ -484,9 +488,21 @@ class DictionaryService {
   validateWordQuality(word, def) {
     if (!word || word.length < 4 || word.length > 15) return false;
     if (/[^a-z]/.test(word.toLowerCase())) return false;
+    const partOfSpeech = def.meanings?.[0]?.partOfSpeech || '';
     const definition = def.meanings?.[0]?.definitions?.[0]?.definition || '';
     if (definition.length < 10) return false;
     if (/plural of|past tense of/i.test(definition)) return false;
+    // The 20k common-word source list is a raw web-crawl corpus, so it
+    // mixes real vocabulary with place names, given names, and surnames
+    // ("bergen", "titus", "cathy", "englewood") — dictionaryapi.dev happily
+    // returns a real definition for these ("A city in Norway.", "A male
+    // given name.") since they ARE real dictionary entries, just not the
+    // kind of word a reading/vocabulary exercise should ever present.
+    if (/proper noun/i.test(partOfSpeech)) return false;
+    if (/\b(surname|given name|forename)\b/i.test(definition)) return false;
+    const placeWord = /\b(country|city|town|village|district|province|county|municipality|borough|neighbou?rhood|republic)\b/i;
+    if (placeWord.test(definition) && /\bin\b/i.test(definition)) return false;
+    if (/\b(emperor|empress|king|queen|president|senator|pharaoh|caesar|dynasty)\b/i.test(definition)) return false;
     return true;
   }
 

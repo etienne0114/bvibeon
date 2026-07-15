@@ -143,15 +143,23 @@ class DictionaryService {
         const parsed = this.parseDictionaryResponse(response.data[0]);
         if (parsed) {
           this._definitionCache.set(cacheKey, { data: parsed, ts: Date.now() });
-          await this._storeInDatabaseCache({ 
-            ...parsed, 
-            language: langCode, 
-            source: 'free_dictionary',
-            definition: parsed.meanings?.[0]?.definitions?.[0]?.definition || '',
-            examples: this.extractExamples(parsed),
-            synonyms: this.extractSynonyms(parsed),
-            antonyms: this.extractAntonyms(parsed),
-          });
+          // Callers like the Translator's "define as you type" box legitimately
+          // query every partial word on every keystroke — that's fine for a
+          // one-off display, but unconditionally persisting every response is
+          // how single letters ("i", "h", "u"...) and other junk ended up
+          // cached into the SAME pool the vocabulary drill draws random
+          // "new words" from. Gate the write, not the read.
+          if (this.validateWordQuality(w, parsed)) {
+            await this._storeInDatabaseCache({
+              ...parsed,
+              language: langCode,
+              source: 'free_dictionary',
+              definition: parsed.meanings?.[0]?.definitions?.[0]?.definition || '',
+              examples: this.extractExamples(parsed),
+              synonyms: this.extractSynonyms(parsed),
+              antonyms: this.extractAntonyms(parsed),
+            });
+          }
           return parsed;
         }
       }
@@ -286,7 +294,14 @@ class DictionaryService {
     const res = await axios.get(this.apis.datamuse, { params: { sp: word, max: 1, md: 'dp' }, timeout: 2500 });
     const item = res.data?.[0];
     if (!item?.defs?.[0]) return null;
-    
+
+    // `sp:` is a FUZZY spelling search, not an exact lookup — querying an
+    // incomplete/garbled string like "discri" happily returns "discrete"'s
+    // definition. Caching that under the original garbled word is how junk
+    // entries like "discriti"/"discr"/"h" ended up served as real
+    // vocabulary. Only trust a result that matched the exact word asked for.
+    if (!item.word || item.word.toLowerCase() !== word.toLowerCase()) return null;
+
     const parts = item.defs[0].split('\t');
     const pos = parts[0] === 'n' ? 'noun' : parts[0] === 'v' ? 'verb' : 'adjective';
     const definition = parts[1] || '';
@@ -305,8 +320,17 @@ class DictionaryService {
     const params = { action: 'query', format: 'json', titles: word, prop: 'extracts', exintro: true, explaintext: true, origin: '*' };
     const res = await axios.get(this.apis.wiktionary, { params, timeout: 2500 });
     const pages = res.data?.query?.pages;
-    const pageId = Object.keys(pages || {})[0];
-    const extract = pageId && pages[pageId]?.extract ? pages[pageId].extract : null;
+    const pageId = pages && Object.keys(pages)[0];
+    const page = pageId ? pages[pageId] : null;
+    if (!page || page.missing !== undefined) return null;
+
+    // MediaWiki normalizes/redirects titles — a garbled query can resolve
+    // to an unrelated real page. Only trust it when the resolved title
+    // actually is the word asked about, same reasoning as the Datamuse
+    // exact-match guard above.
+    if (!page.title || page.title.toLowerCase() !== word.toLowerCase()) return null;
+
+    const extract = page.extract;
     if (!extract) return null;
 
     return {
@@ -458,7 +482,7 @@ class DictionaryService {
   }
 
   validateWordQuality(word, def) {
-    if (!word || word.length < 3 || word.length > 15) return false;
+    if (!word || word.length < 4 || word.length > 15) return false;
     if (/[^a-z]/.test(word.toLowerCase())) return false;
     const definition = def.meanings?.[0]?.definitions?.[0]?.definition || '';
     if (definition.length < 10) return false;

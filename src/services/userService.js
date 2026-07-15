@@ -185,6 +185,20 @@ async function updateProfile(userId, data) {
   return { user: sanitizeUser(updated) };
 }
 
+async function changePassword(userId, { currentPassword, newPassword }) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    throw new AuthError('Account not found', { status: 404 });
+  }
+  const matches = await bcrypt.compare(currentPassword, user.password);
+  if (!matches) {
+    throw new AuthError('Current password is incorrect', { status: 401 });
+  }
+  const hashed = await bcrypt.hash(newPassword, SALT_ROUNDS);
+  await prisma.user.update({ where: { id: userId }, data: { password: hashed } });
+  return { success: true };
+}
+
 async function verifyEmail({ email, code }) {
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
@@ -413,6 +427,7 @@ module.exports = {
   checkVerificationCode,
   completeRegistration,
   updateProfile,
+  changePassword,
   loginUser,
   verifyEmail,
   resendVerification,

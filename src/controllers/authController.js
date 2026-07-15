@@ -1,6 +1,6 @@
 const userService = require('../services/userService');
 const logger = require('../utils/logger');
-const { registerSchema, registerStartSchema, registerCompleteSchema, profileSchema, loginSchema, verifyEmailSchema, resendCodeSchema, forgotPasswordSchema, resetPasswordSchema } = require('../models/schemas');
+const { registerSchema, registerStartSchema, registerCompleteSchema, profileSchema, loginSchema, changePasswordSchema, verifyEmailSchema, resendCodeSchema, forgotPasswordSchema, resetPasswordSchema } = require('../models/schemas');
 
 function handleAuthError(res, error) {
   // Zod validation errors: surface the first human-readable issue
@@ -64,6 +64,16 @@ async function updateProfile(req, res) {
   try {
     const data = profileSchema.parse(req.body);
     const result = await userService.updateProfile(req.user.id, data);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    handleAuthError(res, error);
+  }
+}
+
+async function changePassword(req, res) {
+  try {
+    const data = changePasswordSchema.parse(req.body);
+    const result = await userService.changePassword(req.user.id, data);
     res.json({ success: true, ...result });
   } catch (error) {
     handleAuthError(res, error);
@@ -155,6 +165,7 @@ module.exports = {
   registerCheckCode,
   registerComplete,
   updateProfile,
+  changePassword,
   login,
   verifyEmail,
   resendCode,

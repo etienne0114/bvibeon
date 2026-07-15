@@ -53,6 +53,11 @@ const loginSchema = z.object({
   password: z.string().min(6),
 });
 
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required'),
+  newPassword: z.string().min(8, 'Password must be at least 8 characters'),
+});
+
 const courseQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(50).default(10),
@@ -74,6 +79,7 @@ module.exports = {
   registerCompleteSchema,
   profileSchema,
   loginSchema,
+  changePasswordSchema,
   verifyEmailSchema,
   resendCodeSchema,
   forgotPasswordSchema,

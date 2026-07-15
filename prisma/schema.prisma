@@ -45,6 +45,7 @@ model User {
   createdCourses     Course[]             @relation("CourseInstructor")
   learningPaths      LearningPath[]
   pathEnrollments    PathEnrollment[]
+  skillSessions      SkillSession[]
 }
 
 model Course {
@@ -416,4 +417,33 @@ model QuizAttempt {
 
   @@index([userId, completedAt(sort: Desc)])
   @@index([quizId])
+}
+
+model LearningPassage {
+  id          String         @id @default(uuid())
+  language    String
+  level       String         // BEGINNER, INTERMEDIATE, ADVANCED
+  contentType String         // WORDS (JSON array of ~12 words), PARAGRAPH (plain text)
+  content     String         @db.Text
+  topic       String?
+  source      String         @default("ai_generated") // ai_generated | dictionary | seed
+  createdAt   DateTime       @default(now())
+  sessions    SkillSession[]
+
+  @@index([language, level, contentType])
+}
+
+model SkillSession {
+  id        String          @id @default(uuid())
+  userId    String
+  passageId String
+  skill     String          // READING, LISTENING
+  accuracy  Int             @default(0)
+  mistakes  String?         @db.Text // JSON array of {expected, heard} mistake records
+  createdAt DateTime        @default(now())
+  user      User            @relation(fields: [userId], references: [id])
+  passage   LearningPassage @relation(fields: [passageId], references: [id])
+
+  @@index([userId, skill, createdAt(sort: Desc)])
+  @@index([passageId])
 }

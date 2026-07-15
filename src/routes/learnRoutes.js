@@ -3,6 +3,7 @@ const learnController = require('../controllers/learnController');
 const { auth } = require('../middleware/auth');
 const dictionaryRoutes = require('./dictionaryRoutes');
 const practiceRoutes = require('./practiceRoutes');
+const readingListeningRoutes = require('./readingListeningRoutes');
 
 const router = express.Router();
 router.get('/dashboard', auth, learnController.getDashboard);
@@ -14,4 +15,5 @@ router.get('/practices', auth, learnController.getPractices);
 router.post('/practices/sessions', auth, learnController.startPracticeSession);
 router.use('/dictionary', dictionaryRoutes);
 router.use('/practice', auth, practiceRoutes);
+router.use('/', auth, readingListeningRoutes);
 module.exports = router;

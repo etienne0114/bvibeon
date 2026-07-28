@@ -317,6 +317,253 @@ const COURSES = [
     ].map(([word, definition]) => ({ word, definition, language: 'en' })),
   },
   {
+    title: 'English Grammar: Present Tenses',
+    description: 'Present simple, present continuous, and present perfect — clear rules, real examples, and an interactive check for each.',
+    level: 'BEGINNER',
+    category: 'LANGUAGE',
+    estimatedDuration: 60,
+    imageUrl: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=800',
+    tags: JSON.stringify(['grammar', 'tenses', 'english']),
+    lessons: [
+      {
+        title: 'Present Simple Tense',
+        description: 'Habits, facts, and routines — the tense you\'ll use the most, once you remember the -s.',
+        duration: 20,
+        content: {
+          intro: "The present simple is the tense you'll use most as a beginner — for habits, facts, and things that are generally true. Master its one tricky rule (that extra -s) and the rest is straightforward.",
+          sections: [
+            {
+              type: 'rule',
+              title: 'When do we use it?',
+              points: [
+                'Habits and routines — "I go to the gym every morning."',
+                'Facts and general truths — "Water boils at 100°C."',
+                'Permanent situations — "She lives in Kigali."',
+                'Schedules and timetables — "The bus leaves at 6pm."',
+                'Feelings, senses and opinions (state verbs) — "I like coffee." / "He knows the answer."',
+              ],
+            },
+            {
+              type: 'structure',
+              title: 'How to build it',
+              structureItems: [
+                { label: 'Affirmative', pattern: 'Subject + verb (add -s for he/she/it)', example: 'They work in Kigali. She works in Kigali.' },
+                { label: 'Negative', pattern: "Subject + don't/doesn't + base verb", example: "I don't like tea. He doesn't like tea." },
+                { label: 'Question', pattern: 'Do/Does + subject + base verb?', example: 'Do you speak English? Does she speak English?' },
+              ],
+            },
+            {
+              type: 'table',
+              title: 'Spelling rules for he/she/it',
+              headers: ['Rule', 'Example'],
+              rows: [
+                ['Most verbs: add -s', 'work → works, play → plays'],
+                ['Ends in -s, -ss, -sh, -ch, -x, -o: add -es', 'watch → watches, go → goes, fix → fixes'],
+                ['Consonant + y: change y → ies', 'study → studies, try → tries'],
+                ['Vowel + y: just add -s', 'play → plays, say → says'],
+              ],
+            },
+            {
+              type: 'phrases',
+              title: 'Signal words',
+              items: [
+                phrase('always', '100% of the time — a permanent habit', ''),
+                phrase('usually', 'Very often, as a general habit', ''),
+                phrase('often', 'Frequently', ''),
+                phrase('sometimes', 'Occasionally', ''),
+                phrase('rarely', 'Almost never', ''),
+                phrase('never', '0% of the time', ''),
+                phrase('every day / every week', 'A recurring routine', ''),
+              ],
+            },
+            {
+              type: 'tip',
+              variant: 'warning',
+              title: 'Common mistake',
+              body: "Don't forget the -s! \"She work here\" is wrong — it must be \"She works here.\" The -s only appears with he/she/it, and it never appears after \"does\": \"Does she works?\" is wrong; say \"Does she work?\"",
+            },
+            {
+              type: 'tip',
+              variant: 'info',
+              title: 'Memory trick',
+              body: "Think of he/she/it as the \"-s club\": third-person singular subjects take the -s in affirmative sentences, and that's the ONLY place -s appears in this tense.",
+            },
+            {
+              type: 'practice',
+              title: 'Quick check',
+              questions: [
+                { question: 'She ___ (work) at a hospital.', options: ['work', 'works', 'working', 'is work'], correctIndex: 1, explanation: 'He/she/it takes -s in the present simple: "She works."' },
+                { question: '___ you speak French?', options: ['Do', 'Does', 'Are', 'Is'], correctIndex: 0, explanation: '"You" uses "Do" — "Does" is only for he/she/it.' },
+                { question: "He ___ like spicy food.", options: ["don't", "doesn't", "isn't", 'not'], correctIndex: 1, explanation: 'Negative with he/she/it: doesn\'t + base verb (no extra -s).' },
+                { question: 'Which sentence is correct?', options: ['She go to school by bus.', 'She goes to school by bus.', 'She going to school by bus.', 'She is go to school by bus.'], correctIndex: 1, explanation: '"go" ends in -o, so add -es: goes.' },
+                { question: 'The train ___ at 9am every day.', options: ['leave', 'leaves', 'is leaving', 'left'], correctIndex: 1, explanation: 'Fixed schedules use the present simple: "leaves."' },
+              ],
+            },
+          ],
+        },
+      },
+      {
+        title: 'Present Continuous Tense',
+        description: 'Actions happening right now, temporary situations, and fixed future plans.',
+        duration: 20,
+        content: {
+          intro: "The present continuous describes actions in progress right now, temporary situations, and even fixed future plans. Its form is simple (am/is/are + -ing) — the real skill is knowing when NOT to use it.",
+          sections: [
+            {
+              type: 'rule',
+              title: 'When do we use it?',
+              points: [
+                'Actions happening right now — "I am writing an email."',
+                "Temporary situations, true now but not permanent — \"I'm staying with my cousin this month.\"",
+                'Changing or developing situations — "The weather is getting colder."',
+                "Fixed future arrangements — \"We're meeting the doctor tomorrow at 10.\"",
+                "With \"always\" for annoying repeated habits — \"He's always losing his keys!\"",
+              ],
+            },
+            {
+              type: 'structure',
+              title: 'How to build it',
+              structureItems: [
+                { label: 'Affirmative', pattern: 'Subject + am/is/are + verb-ing', example: 'She is studying right now.' },
+                { label: 'Negative', pattern: 'Subject + am/is/are + not + verb-ing', example: "I'm not working today." },
+                { label: 'Question', pattern: 'Am/Is/Are + subject + verb-ing?', example: 'Are you listening?' },
+              ],
+            },
+            {
+              type: 'table',
+              title: 'Spelling rules for -ing',
+              headers: ['Rule', 'Example'],
+              rows: [
+                ['Most verbs: add -ing', 'work → working, read → reading'],
+                ['Silent -e: drop the e, add -ing', 'make → making, write → writing'],
+                ['Short stressed verb (vowel + consonant): double the consonant', 'run → running, stop → stopping'],
+                ['Ends in -ie: change to -y', 'lie → lying, die → dying'],
+              ],
+            },
+            {
+              type: 'phrases',
+              title: 'Signal words',
+              items: [
+                phrase('now', 'This exact moment', ''),
+                phrase('right now', 'Emphasizes the present moment', ''),
+                phrase('at the moment', 'Currently', ''),
+                phrase('currently', 'At this time', ''),
+                phrase('look! / listen!', 'Draws attention to something happening now', ''),
+                phrase('these days', 'A temporary current period', ''),
+              ],
+            },
+            {
+              type: 'tip',
+              variant: 'warning',
+              title: 'Common mistake',
+              body: 'State verbs don\'t usually take -ing. Don\'t say "I am knowing the answer" or "I am wanting coffee" — say "I know the answer" and "I want coffee." Verbs like know, like, love, hate, believe, understand, need, own and belong describe states, not actions.',
+            },
+            {
+              type: 'tip',
+              variant: 'info',
+              title: 'Memory trick',
+              body: 'If you can say "right now" and it still makes sense, it\'s probably present continuous: "I am eating (right now)" ✓ — but "I am knowing (right now)" ✗ sounds wrong, because knowing isn\'t something you actively "do" at a moment.',
+            },
+            {
+              type: 'practice',
+              title: 'Quick check',
+              questions: [
+                { question: 'Listen! Someone ___ (knock) at the door.', options: ['knock', 'knocks', 'is knocking', 'knocked'], correctIndex: 2, explanation: '"Listen!" signals something happening right now → present continuous.' },
+                { question: 'I ___ (not/understand) this exercise.', options: ['am not understanding', "don't understand", "doesn't understand", 'not understand'], correctIndex: 1, explanation: '"Understand" is a state verb — use present simple, not continuous.' },
+                { question: 'We ___ (meet) James for lunch tomorrow.', options: ['meet', 'meets', 'are meeting', 'met'], correctIndex: 2, explanation: 'Present continuous can describe a fixed future plan.' },
+                { question: 'Which spelling is correct for "run" + -ing?', options: ['runing', 'runeing', 'running', 'runnning'], correctIndex: 2, explanation: 'Short verb, one vowel + one consonant, stressed: double the "n" → running.' },
+                { question: 'She ___ (always/lose) her umbrella!', options: ['always loses', 'is always losing', 'always is losing', 'always lose'], correctIndex: 1, explanation: '"Always" + present continuous expresses an annoying repeated habit.' },
+              ],
+            },
+          ],
+        },
+      },
+      {
+        title: 'Present Perfect Tense',
+        description: 'Connecting the past to now — experiences, unfinished time periods, and recent results.',
+        duration: 20,
+        content: {
+          intro: "The present perfect connects the past to now — it's for experiences, unfinished time periods, and recent events that still matter. It's often the hardest tense for learners, because many languages don't have an exact equivalent.",
+          sections: [
+            {
+              type: 'rule',
+              title: 'When do we use it?',
+              points: [
+                'Life experiences, with no specific time given — "I have visited Paris."',
+                'Actions that started in the past and continue now — "I have lived here for five years."',
+                'Recently completed actions with a present result — "I have lost my keys" (so I can\'t get in now).',
+                'News and recent announcements — "The president has resigned."',
+              ],
+            },
+            {
+              type: 'structure',
+              title: 'How to build it',
+              structureItems: [
+                { label: 'Affirmative', pattern: 'Subject + have/has + past participle', example: 'They have finished the project.' },
+                { label: 'Negative', pattern: "Subject + have/has + not + past participle", example: "She hasn't called yet." },
+                { label: 'Question', pattern: 'Have/Has + subject + past participle?', example: 'Have you eaten?' },
+              ],
+            },
+            {
+              type: 'table',
+              title: '"For" vs "since", and tricky participles',
+              headers: ['Rule', 'Example'],
+              rows: [
+                ['for + a duration', 'for 5 years, for a long time, for two weeks'],
+                ['since + a starting point', 'since 2020, since Monday, since I was born'],
+                ['go → gone / been', 'He has gone to Paris (still there) vs He has been to Paris (visited, back now)'],
+                ['Irregular participles worth memorizing', 'see → seen, eat → eaten, write → written'],
+              ],
+            },
+            {
+              type: 'phrases',
+              title: 'Signal words',
+              items: [
+                phrase('already', 'Something happened before now, often sooner than expected', ''),
+                phrase('yet', 'In negatives/questions, for something expected but not done', ''),
+                phrase('just', 'Very recently', ''),
+                phrase('ever', 'At any time — used in experience questions', ''),
+                phrase('never', 'At no time', ''),
+                phrase('since / for', 'Marks the start point or duration of a continuing action', ''),
+              ],
+            },
+            {
+              type: 'tip',
+              variant: 'warning',
+              title: 'Common mistake',
+              body: 'Never use the present perfect with a specific finished time (yesterday, last week, in 2019, at 3pm). "I have visited Paris in 2019" ✗ — once you give a specific past date, switch to the past simple: "I visited Paris in 2019" ✓.',
+            },
+            {
+              type: 'tip',
+              variant: 'info',
+              title: 'Memory trick',
+              body: '"Have/has + participle" means the result is still relevant NOW. Compare: "I lost my keys" (just a past fact) vs "I have lost my keys" (and that\'s why I\'m stuck outside right now).',
+            },
+            {
+              type: 'practice',
+              title: 'Quick check',
+              questions: [
+                { question: 'I ___ (see) that film three times.', options: ['saw', 'have seen', 'seeing', 'see'], correctIndex: 1, explanation: 'Life experience, no specific time → present perfect.' },
+                { question: 'She ___ in London since 2018.', options: ['lives', 'lived', 'has lived', 'is living'], correctIndex: 2, explanation: '"Since" + an ongoing situation starting in the past → present perfect.' },
+                { question: 'Which sentence is correct?', options: ['I have visited Rome in 2020.', 'I visited Rome in 2020.', 'I have visit Rome in 2020.', 'I am visiting Rome in 2020.'], correctIndex: 1, explanation: 'A specific past time ("in 2020") needs the past simple, not present perfect.' },
+                { question: '___ you ever tried sushi?', options: ['Did', 'Do', 'Have', 'Are'], correctIndex: 2, explanation: '"Ever" about experience → present perfect: "Have you ever...?"' },
+                { question: "He has ___ (go) to the shop — he'll be back in 10 minutes.", options: ['went', 'gone', 'been', 'going'], correctIndex: 1, explanation: '"has gone" = he is still there/on the way; "has been" would mean he already returned.' },
+              ],
+            },
+          ],
+        },
+      },
+    ],
+    vocabulary: [
+      ['always', 'Present simple signal word: 100% of the time, a permanent habit'],
+      ['usually', 'Present simple signal word: very often, as a general habit'],
+      ['currently', 'Present continuous signal word: happening at this time'],
+      ['already', 'Present perfect signal word: before now, often sooner than expected'],
+      ['yet', 'Present perfect signal word: used in questions/negatives for something expected but not done'],
+      ['since', 'Present perfect signal word: marks the starting point of a continuing action (since 2020)'],
+    ].map(([word, definition]) => ({ word, definition, language: 'en' })),
+  },
+  {
     title: 'Français pratique',
     description: 'Le français utile de tous les jours : salutations, courses, voyages et conversations réelles.',
     level: 'BEGINNER',

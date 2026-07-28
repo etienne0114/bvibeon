@@ -318,10 +318,10 @@ const COURSES = [
   },
   {
     title: 'English Grammar: Present Tenses',
-    description: 'Present simple, present continuous, and present perfect — clear rules, real examples, and an interactive check for each.',
+    description: 'Present simple, continuous, perfect, and perfect continuous — clear rules, real examples, an interactive check for each, and a side-by-side comparison to lock it all in.',
     level: 'BEGINNER',
     category: 'LANGUAGE',
-    estimatedDuration: 60,
+    estimatedDuration: 100,
     imageUrl: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=800',
     tags: JSON.stringify(['grammar', 'tenses', 'english']),
     lessons: [
@@ -341,6 +341,8 @@ const COURSES = [
                 'Permanent situations — "She lives in Kigali."',
                 'Schedules and timetables — "The bus leaves at 6pm."',
                 'Feelings, senses and opinions (state verbs) — "I like coffee." / "He knows the answer."',
+                'Instructions and directions — "You turn left, then you cross the bridge."',
+                'Future events on a timetable, or after "when/if" about the future — "The film starts at 8." / "When she arrives, call me."',
               ],
             },
             {
@@ -441,6 +443,16 @@ const COURSES = [
               ],
             },
             {
+              type: 'table',
+              title: 'Present simple vs. present continuous',
+              headers: ['Present simple', 'Present continuous'],
+              rows: [
+                ['A habit or routine  "I drink coffee every morning."', 'Happening right now  "I\'m drinking coffee right now."'],
+                ['A permanent fact  "She works in a bank."', 'A temporary situation — "She\'s working from home this week."'],
+                ['A fixed schedule/timetable  "The train leaves at 6."', 'A personal arrangement  "I\'m leaving at 6 to catch it."'],
+              ],
+            },
+            {
               type: 'phrases',
               title: 'Signal words',
               items: [
@@ -516,6 +528,16 @@ const COURSES = [
               ],
             },
             {
+              type: 'table',
+              title: 'Present perfect vs. past simple',
+              headers: ['Present perfect', 'Past simple'],
+              rows: [
+                ['Unspecified time — "I have visited Paris."', 'A specific finished time — "I visited Paris in 2019."'],
+                ['Still connects to now — "I have lost my keys" (can\'t get in right now)', 'Just a past fact — "I lost my keys yesterday" (found them already)'],
+                ['Signal words: already, yet, just, ever, never, since, for', 'Signal words: yesterday, last week, in 2020, ago, when I was young'],
+              ],
+            },
+            {
               type: 'phrases',
               title: 'Signal words',
               items: [
@@ -553,6 +575,130 @@ const COURSES = [
           ],
         },
       },
+      {
+        title: 'Present Perfect Continuous Tense',
+        description: 'The missing piece — for ongoing duration and activity, not just results.',
+        duration: 20,
+        content: {
+          intro: "The present perfect continuous is the least-taught present tense, but it fills a real gap: it's for ongoing ACTIVITY and DURATION, where the present perfect alone only gives you the result or the count.",
+          sections: [
+            {
+              type: 'rule',
+              title: 'When do we use it?',
+              points: [
+                'An activity that started in the past and is still going, with the focus on duration — "I have been studying English for three years."',
+                'A recently stopped action with a visible present result — "I\'m tired because I\'ve been running." / "Her eyes are red — she\'s been crying."',
+                'A repeated action building up to now — "I\'ve been calling him all day, but he doesn\'t answer."',
+                '"How long" questions about something still happening — "How long have you been waiting?"',
+                'Emphasizing that something may be unfinished — "I\'ve been reading that book" (still going) vs "I\'ve read that book" (done).',
+              ],
+            },
+            {
+              type: 'structure',
+              title: 'How to build it',
+              structureItems: [
+                { label: 'Affirmative', pattern: 'Subject + have/has + been + verb-ing', example: 'She has been working here for two years.' },
+                { label: 'Negative', pattern: "Subject + have/has + not + been + verb-ing", example: "They haven't been listening." },
+                { label: 'Question', pattern: 'Have/Has + subject + been + verb-ing?', example: 'Have you been waiting long?' },
+              ],
+            },
+            {
+              type: 'table',
+              title: 'Present perfect vs. present perfect continuous',
+              headers: ['Present perfect', 'Present perfect continuous'],
+              rows: [
+                ['Focus on result, completion, or a count — "I have written three emails."', 'Focus on the ongoing activity or process — "I have been writing emails all morning."'],
+                ['Sounds like a permanent, settled fact — "I have lived here for 10 years."', 'Sounds like an ordinary, ongoing activity — "I have been living here for 10 years."'],
+                ['State verbs only — "I have known him for years."', 'Never with state verbs — "I have been knowing him" ✗ is always wrong.'],
+              ],
+            },
+            {
+              type: 'phrases',
+              title: 'Signal words',
+              items: [
+                phrase('how long', 'Asks about the duration of something ongoing', ''),
+                phrase('lately', 'In recent times, up to now', ''),
+                phrase('recently', 'Not long ago, often still relevant', ''),
+                phrase('all day / all week', 'Emphasizes continuous duration', ''),
+                phrase('still', 'The activity has not stopped', ''),
+              ],
+            },
+            {
+              type: 'tip',
+              variant: 'warning',
+              title: 'Common mistake',
+              body: 'State verbs (know, believe, like, love, want, understand, belong, own) never take the continuous form — not even here. "I\'ve been knowing him for years" ✗ is always wrong; say "I\'ve known him for years" ✓.',
+            },
+            {
+              type: 'tip',
+              variant: 'info',
+              title: 'Memory trick',
+              body: 'If you could answer the question "how long?", it\'s probably present perfect continuous. If you\'re more interested in "how many?" or "is it done?", reach for the plain present perfect instead.',
+            },
+            {
+              type: 'practice',
+              title: 'Quick check',
+              questions: [
+                { question: 'I ___ (wait) for you for an hour!', options: ['waited', 'have waited', 'have been waiting', 'am waiting'], correctIndex: 2, explanation: 'Duration up to now, ongoing activity → present perfect continuous.' },
+                { question: "She's out of breath. She ___ (run).", options: ['ran', 'has run', 'has been running', 'runs'], correctIndex: 2, explanation: 'Recently stopped activity with a visible present result → present perfect continuous.' },
+                { question: 'How long have you ___ (learn) English?', options: ['learned', 'been learning', 'learning', 'learn'], correctIndex: 1, explanation: '"How long" + an ongoing activity → have/has + been + verb-ing.' },
+                { question: "I've ___ (know) him since childhood.", options: ['been knowing', 'known', 'knowing', 'know'], correctIndex: 1, explanation: '"Know" is a state verb — never use the continuous form, even with "since": "I\'ve known him", not "I\'ve been knowing him."' },
+                { question: "They ___ (build) that bridge for two years — it's still not finished.", options: ['built', 'have built', 'have been building', 'are building'], correctIndex: 2, explanation: 'An unfinished, ongoing project emphasized by duration → present perfect continuous.' },
+              ],
+            },
+          ],
+        },
+      },
+      {
+        title: 'Present Tenses Compared',
+        description: 'All four present tenses, side by side — the fastest way to stop confusing them.',
+        duration: 15,
+        content: {
+          intro: "You've learned all four present tenses individually — now let's put them side by side. Seeing the contrast directly, with the same verb across all four, is the fastest way to make the differences stick.",
+          sections: [
+            {
+              type: 'table',
+              title: 'The four present tenses at a glance',
+              headers: ['Tense', 'Focus', 'Example'],
+              rows: [
+                ['Present simple', 'Habits, facts, permanent truths', 'She works in Kigali.'],
+                ['Present continuous', 'Happening now, temporary, fixed future plans', 'She is working right now.'],
+                ['Present perfect', 'Result or experience, unspecified time', 'She has worked here for years.'],
+                ['Present perfect continuous', 'Duration and ongoing process, may still continue', 'She has been working here since 2019.'],
+              ],
+            },
+            {
+              type: 'table',
+              title: 'Same verb, four meanings',
+              headers: ['Tense', 'Sentence', 'Meaning'],
+              rows: [
+                ['Present simple', 'He writes novels.', "His job or habit — he's a novelist."],
+                ['Present continuous', 'He is writing a novel.', 'Right now, in progress, temporary.'],
+                ['Present perfect', 'He has written three novels.', 'Achievement so far — a count, unspecified time.'],
+                ['Present perfect continuous', 'He has been writing this novel for two years.', 'The ongoing process, emphasizing duration — maybe unfinished.'],
+              ],
+            },
+            {
+              type: 'tip',
+              variant: 'info',
+              title: 'Quick decision guide',
+              body: "Ask yourself: Is it a HABIT or FACT? → present simple. Is it happening RIGHT NOW or temporary? → present continuous. Is it a RESULT or an experience with no specific time? → present perfect. Is it about ongoing DURATION or a process? → present perfect continuous.",
+            },
+            {
+              type: 'practice',
+              title: 'Mixed review',
+              questions: [
+                { question: 'Every morning, she ___ (drink) coffee before work.', options: ['drinks', 'is drinking', 'has drunk', 'has been drinking'], correctIndex: 0, explanation: 'A daily habit → present simple.' },
+                { question: 'Look! It ___ (rain).', options: ['rains', 'is raining', 'has rained', 'has been raining'], correctIndex: 1, explanation: 'Happening right now → present continuous.' },
+                { question: "I ___ (finish) my homework — I'm free now!", options: ['finish', 'am finishing', 'have finished', 'have been finishing'], correctIndex: 2, explanation: 'A completed action with a present result → present perfect.' },
+                { question: 'We ___ (wait) for the bus for 20 minutes already.', options: ['wait', 'are waiting', 'have waited', 'have been waiting'], correctIndex: 3, explanation: 'Duration up to now, still ongoing → present perfect continuous.' },
+                { question: 'The Earth ___ (orbit) the sun.', options: ['orbits', 'is orbiting', 'has orbited', 'has been orbiting'], correctIndex: 0, explanation: 'A permanent scientific fact → present simple.' },
+                { question: 'She ___ (live) in Paris since 2015.', options: ['lives', 'is living', 'has lived', 'is live'], correctIndex: 2, explanation: '"Since" + an unspecified ongoing fact → present perfect.' },
+              ],
+            },
+          ],
+        },
+      },
     ],
     vocabulary: [
       ['always', 'Present simple signal word: 100% of the time, a permanent habit'],
@@ -561,6 +707,8 @@ const COURSES = [
       ['already', 'Present perfect signal word: before now, often sooner than expected'],
       ['yet', 'Present perfect signal word: used in questions/negatives for something expected but not done'],
       ['since', 'Present perfect signal word: marks the starting point of a continuing action (since 2020)'],
+      ['recently', 'Present perfect continuous signal word: not long ago, often still relevant'],
+      ['still', 'Present perfect continuous signal word: the activity has not stopped'],
     ].map(([word, definition]) => ({ word, definition, language: 'en' })),
   },
   {

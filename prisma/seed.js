@@ -7,6 +7,11 @@ const prisma = new PrismaClient();
 // { intro, sections: [{ type: 'phrases'|'tip', ... }] }
 const phrase = (target, translation, pronunciation) => ({ target, translation, pronunciation });
 
+// Deep, multi-level tense content lives in its own file per topic (e.g.
+// beginner/intermediate/advanced Present Simple) so this file doesn't keep
+// growing without bound as more tenses get the same treatment.
+const presentSimpleLessons = require('./lessons/presentSimple');
+
 const COURSES = [
   {
     title: 'Kinyarwanda for Beginners',
@@ -325,85 +330,7 @@ const COURSES = [
     imageUrl: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=800',
     tags: JSON.stringify(['grammar', 'tenses', 'english']),
     lessons: [
-      {
-        title: 'Present Simple Tense',
-        description: 'Habits, facts, and routines — the tense you\'ll use the most, once you remember the -s.',
-        duration: 20,
-        content: {
-          intro: "The present simple is the tense you'll use most as a beginner — for habits, facts, and things that are generally true. Master its one tricky rule (that extra -s) and the rest is straightforward.",
-          sections: [
-            {
-              type: 'rule',
-              title: 'When do we use it?',
-              points: [
-                'Habits and routines — "I go to the gym every morning."',
-                'Facts and general truths — "Water boils at 100°C."',
-                'Permanent situations — "She lives in Kigali."',
-                'Schedules and timetables — "The bus leaves at 6pm."',
-                'Feelings, senses and opinions (state verbs) — "I like coffee." / "He knows the answer."',
-                'Instructions and directions — "You turn left, then you cross the bridge."',
-                'Future events on a timetable, or after "when/if" about the future — "The film starts at 8." / "When she arrives, call me."',
-              ],
-            },
-            {
-              type: 'structure',
-              title: 'How to build it',
-              structureItems: [
-                { label: 'Affirmative', pattern: 'Subject + verb (add -s for he/she/it)', example: 'They work in Kigali. She works in Kigali.' },
-                { label: 'Negative', pattern: "Subject + don't/doesn't + base verb", example: "I don't like tea. He doesn't like tea." },
-                { label: 'Question', pattern: 'Do/Does + subject + base verb?', example: 'Do you speak English? Does she speak English?' },
-              ],
-            },
-            {
-              type: 'table',
-              title: 'Spelling rules for he/she/it',
-              headers: ['Rule', 'Example'],
-              rows: [
-                ['Most verbs: add -s', 'work → works, play → plays'],
-                ['Ends in -s, -ss, -sh, -ch, -x, -o: add -es', 'watch → watches, go → goes, fix → fixes'],
-                ['Consonant + y: change y → ies', 'study → studies, try → tries'],
-                ['Vowel + y: just add -s', 'play → plays, say → says'],
-              ],
-            },
-            {
-              type: 'phrases',
-              title: 'Signal words',
-              items: [
-                phrase('always', '100% of the time — a permanent habit', ''),
-                phrase('usually', 'Very often, as a general habit', ''),
-                phrase('often', 'Frequently', ''),
-                phrase('sometimes', 'Occasionally', ''),
-                phrase('rarely', 'Almost never', ''),
-                phrase('never', '0% of the time', ''),
-                phrase('every day / every week', 'A recurring routine', ''),
-              ],
-            },
-            {
-              type: 'tip',
-              variant: 'warning',
-              title: 'Common mistake',
-              body: "Don't forget the -s! \"She work here\" is wrong — it must be \"She works here.\" The -s only appears with he/she/it, and it never appears after \"does\": \"Does she works?\" is wrong; say \"Does she work?\"",
-            },
-            {
-              type: 'tip',
-              variant: 'info',
-              title: 'Memory trick',
-              body: "Think of he/she/it as the \"-s club\": third-person singular subjects take the -s in affirmative sentences, and that's the ONLY place -s appears in this tense.",
-            },
-            {
-              type: 'practice',
-              title: 'Quick check',
-              questions: [
-                { question: 'She ___ (work) at a hospital.', options: ['work', 'works', 'working', 'is work'], correctIndex: 1, explanation: 'He/she/it takes -s in the present simple: "She works."' },
-                { question: '___ you speak French?', options: ['Do', 'Does', 'Are', 'Is'], correctIndex: 0, explanation: '"You" uses "Do" — "Does" is only for he/she/it.' },
-                { question: "He ___ like spicy food.", options: ["don't", "doesn't", "isn't", 'not'], correctIndex: 1, explanation: 'Negative with he/she/it: doesn\'t + base verb (no extra -s).' },
-                { question: 'Which sentence is correct?', options: ['She go to school by bus.', 'She goes to school by bus.', 'She going to school by bus.', 'She is go to school by bus.'], correctIndex: 1, explanation: '"go" ends in -o, so add -es: goes.' },
-                { question: 'The train ___ at 9am every day.', options: ['leave', 'leaves', 'is leaving', 'left'], correctIndex: 1, explanation: 'Fixed schedules use the present simple: "leaves."' },
-              ],
-            },
-          ],
-        },
-      },
+      ...presentSimpleLessons,
       {
         title: 'Present Continuous Tense',
         description: 'Actions happening right now, temporary situations, and fixed future plans.',
@@ -922,10 +849,15 @@ async function main() {
       create: { ...courseFields, instructorId: admin.id },
     });
 
+    // Identify each lesson by (courseId, title), not by array position —
+    // inserting a lesson earlier in the array (e.g. splitting one lesson
+    // into three leveled ones) shifts every later lesson's position index,
+    // and a position-keyed upsert would silently overwrite an unrelated
+    // existing row's content while keeping its old id/progress attached.
     const lessonRecords = [];
     for (let i = 0; i < lessons.length; i += 1) {
       const l = lessons[i];
-      const existing = await prisma.lesson.findFirst({ where: { courseId: course.id, order: i + 1 } });
+      const existing = await prisma.lesson.findFirst({ where: { courseId: course.id, title: l.title } });
       const data = {
         courseId: course.id,
         title: l.title,
@@ -940,6 +872,18 @@ async function main() {
         ? await prisma.lesson.update({ where: { id: existing.id }, data })
         : await prisma.lesson.create({ data });
       lessonRecords.push(lesson);
+    }
+
+    // Clean up lessons whose title no longer appears in the source (renamed
+    // or removed) so re-seeding doesn't leave stale rows behind. Skipped
+    // quietly if a learner's progress references one (FK restrict) — a
+    // leftover row is far safer than losing that progress.
+    const currentTitles = lessons.map((l) => l.title);
+    const staleLessons = await prisma.lesson.findMany({ where: { courseId: course.id, title: { notIn: currentTitles } } });
+    for (const stale of staleLessons) {
+      await prisma.lesson.delete({ where: { id: stale.id } }).catch(() => {
+        console.log(`  ⚠️  Kept stale lesson "${stale.title}" (has learner progress attached)`);
+      });
     }
 
     if (quiz) {

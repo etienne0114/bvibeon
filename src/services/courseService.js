@@ -89,6 +89,21 @@ class CourseService {
    * Course detail with ordered lessons and (optionally) the user's progress
    */
   async getCourseById(courseId, userId = null) {
+    // Checked first (a single fast indexed lookup) so the lessons query
+    // below can skip `content` entirely for a non-enrolled viewer — the
+    // frontend's locked preview list never reads it (lessons stay
+    // unopenable until enrolled), so fetching and transferring every
+    // lesson's full content JSON (tables, practice questions — sizeable for
+    // a content-heavy course) on every course-detail page view before
+    // someone even enrolls was pure waste.
+    const enrollment = userId
+      ? await prisma.courseEnrollment.findUnique({
+          where: { userId_courseId: { userId, courseId } },
+          select: { progress: true, isCompleted: true, enrolledAt: true },
+        })
+      : null;
+    const canViewContent = Boolean(enrollment);
+
     const course = await prisma.course.findFirst({
       where: { id: courseId, status: 'PUBLISHED' },
       include: {
@@ -104,7 +119,7 @@ class CourseService {
             order: true,
             duration: true,
             type: true,
-            content: true,
+            ...(canViewContent ? { content: true } : {}),
             ...(userId
               ? { progress: { where: { userId }, select: { status: true, completionPercentage: true, timeSpentMinutes: true } } }
               : {}),
@@ -114,13 +129,6 @@ class CourseService {
     });
     if (!course) return null;
 
-    let enrollment = null;
-    if (userId) {
-      enrollment = await prisma.courseEnrollment.findUnique({
-        where: { userId_courseId: { userId, courseId } },
-        select: { progress: true, isCompleted: true, enrolledAt: true },
-      });
-    }
     return {
       ...course,
       enrollment,

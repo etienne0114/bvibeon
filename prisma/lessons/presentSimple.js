@@ -86,6 +86,83 @@ module.exports = [
     },
   },
   {
+    title: 'Present Simple Tense — Elementary',
+    description: 'Putting it to work — daily routines, opinions, and asking real questions.',
+    duration: 20,
+    content: {
+      intro:
+        "You know the rules — now let's put them to work in real conversation: describing your day in order, giving opinions naturally, and asking the questions people actually ask.",
+      sections: [
+        {
+          type: 'rule',
+          title: 'Making it sound natural',
+          points: [
+            'Sequencing words link a routine into a story — "First I wake up, then I have breakfast, after that I go to work, and finally I relax."',
+            'Opinion verbs (like, love, enjoy, hate, dislike, don\'t mind) are followed by a verb-ing form, not "to + verb" — "I enjoy cooking," not "I enjoy to cook."',
+            'Adjective + preposition patterns describe habits and traits — "good at", "interested in", "afraid of", "keen on", "tired of" + verb-ing.',
+            'Every question word (What/Where/When/Why/Who/How often) still needs do/does in front of the subject — the question word doesn\'t replace that rule.',
+          ],
+        },
+        {
+          type: 'structure',
+          title: 'Asking real questions',
+          structureItems: [
+            { label: 'What', pattern: 'What + do/does + subject + verb?', example: 'What do you do at the weekend?' },
+            { label: 'Where', pattern: 'Where + do/does + subject + verb?', example: 'Where does she work?' },
+            { label: 'How often', pattern: 'How often + do/does + subject + verb?', example: 'How often do you exercise?' },
+          ],
+        },
+        {
+          type: 'table',
+          title: 'Verb + -ing after opinion verbs',
+          headers: ['Pattern', 'Example'],
+          rows: [
+            ['like/love/enjoy + verb-ing', 'I love reading before bed.'],
+            ['hate/dislike + verb-ing', 'He hates waiting in queues.'],
+            ["don't mind + verb-ing", "I don't mind sharing a room."],
+          ],
+        },
+        {
+          type: 'phrases',
+          title: 'Everyday collocations',
+          items: [
+            phrase('good at', 'Skilled or talented in something', ''),
+            phrase('interested in', 'Curious about, wants to know more', ''),
+            phrase('afraid of', 'Scared of', ''),
+            phrase('keen on', 'Enthusiastic about (British English)', ''),
+            phrase('tired of', 'Bored or fed up with something repeated', ''),
+          ],
+        },
+        {
+          type: 'tip',
+          variant: 'warning',
+          title: 'Common mistake',
+          body:
+            'Don\'t follow opinion verbs with "to + infinitive": "I enjoy to swim" ✗ is wrong — "enjoy", "like", "love", "hate", "dislike" and "don\'t mind" all take verb-ing: "I enjoy swimming" ✓.',
+        },
+        {
+          type: 'tip',
+          variant: 'info',
+          title: 'Memory trick',
+          body:
+            'Build routines like a chain: FIRST → THEN → AFTER THAT → FINALLY. Practise describing your own morning out loud using all four links before moving on.',
+        },
+        {
+          type: 'practice',
+          title: 'Quick check',
+          questions: [
+            { question: 'I ___ (enjoy) ___ (cook) for my family.', options: ['enjoy / to cook', 'enjoy / cooking', 'enjoy / cook', 'enjoying / cooking'], correctIndex: 1, explanation: '"Enjoy" is followed by verb-ing: "enjoy cooking".' },
+            { question: 'She is ___ languages — she speaks four!', options: ['good in', 'good at', 'good for', 'good on'], correctIndex: 1, explanation: 'The fixed collocation is "good at" + noun/verb-ing.' },
+            { question: '___ do you visit your grandparents?', options: ['What', 'How often', 'Why', 'Who'], correctIndex: 1, explanation: '"How often" asks about frequency — a very common present simple question.' },
+            { question: 'First I get up, ___ I shower, and then I get dressed.', options: ['finally', 'after that', 'then', 'first'], correctIndex: 2, explanation: '"Then" is the natural second link in a routine sequence.' },
+            { question: 'He ___ (be) afraid ___ (fly).', options: ["is / to fly", 'is / of flying', 'is / fly', 'be / of flying'], correctIndex: 1, explanation: '"Afraid of" is followed by verb-ing: "afraid of flying".' },
+            { type: 'fill', question: 'Complete the collocation: She is very good ___ languages. (one word)', answer: 'at', explanation: 'The fixed collocation is "good at" + noun/verb-ing.' },
+          ],
+        },
+      ],
+    },
+  },
+  {
     title: 'Present Simple Tense — Intermediate',
     description: 'Pronunciation, word order, and the sentence patterns native speakers actually use.',
     duration: 20,

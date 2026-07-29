@@ -93,6 +93,81 @@ module.exports = [
     },
   },
   {
+    title: 'Present Continuous Tense — Elementary',
+    description: 'Short answers, real questions, and "at the moment" for ongoing projects.',
+    duration: 20,
+    content: {
+      intro:
+        "Now let's use the present continuous the way people actually talk: answering quickly, asking what someone's up to, and describing things you're in the middle of — even if you're not doing them this exact second.",
+      sections: [
+        {
+          type: 'rule',
+          title: 'Using it in real conversation',
+          points: [
+            'Short answers repeat "to be", not the full verb — "Are you listening?" "Yes, I am." (not "Yes, I listening.")',
+            '"At the moment" can describe a current project or phase, not just this literal second — "I\'m reading a great book at the moment" (you might not be holding it right now, but it\'s ongoing this week).',
+            '"What + be + subject + doing?" is the everyday way to ask what someone is up to — "What are you doing this weekend?"',
+            'A polite, softer way to say you\'re just browsing — "I\'m just looking, thanks" — uses the continuous, not the simple.',
+          ],
+        },
+        {
+          type: 'table',
+          title: 'Short answers',
+          headers: ['Question', 'Short answer (yes)', 'Short answer (no)'],
+          rows: [
+            ['Are you coming?', 'Yes, I am.', "No, I'm not."],
+            ['Is she working?', 'Yes, she is.', "No, she isn't."],
+            ['Are they staying?', 'Yes, they are.', "No, they aren't."],
+          ],
+        },
+        {
+          type: 'structure',
+          title: '"What are you doing?" and its family',
+          structureItems: [
+            { label: 'Right now', pattern: 'What + are/is + subject + doing?', example: 'What are you doing? — I\'m cooking dinner.' },
+            { label: 'This period', pattern: 'What + are/is + subject + working on/reading/etc.?', example: "What are you working on at the moment? — A new app." },
+          ],
+        },
+        {
+          type: 'phrases',
+          title: 'Useful everyday lines',
+          items: [
+            phrase("I'm just looking, thanks", 'A polite way to decline help while shopping', ''),
+            phrase("What are you up to?", 'Casual way to ask what someone is doing', ''),
+            phrase("I'm working on it", 'Something is in progress, not finished yet', ''),
+            phrase("Hang on, I'm coming", 'Announcing you are on your way right now', ''),
+          ],
+        },
+        {
+          type: 'tip',
+          variant: 'warning',
+          title: 'Common mistake',
+          body:
+            'Don\'t drop "to be" from a short answer: "Yes, I do" ✗ answers a present SIMPLE question, not a continuous one. For "Are you coming?" the only correct short answers are "Yes, I am" / "No, I\'m not."',
+        },
+        {
+          type: 'tip',
+          variant: 'info',
+          title: 'Memory trick',
+          body:
+            '"At the moment" is more flexible than "right now" — it can mean this exact second OR this general period (this week, this month). "Right now" almost always means this exact second.',
+        },
+        {
+          type: 'practice',
+          title: 'Quick check',
+          questions: [
+            { question: '"Is he sleeping?" — "No, ___."', options: ["he doesn't", "he isn't", 'he not', "he don't"], correctIndex: 1, explanation: 'Short answers for continuous questions repeat "to be": "No, he isn\'t."' },
+            { question: '"___ are you doing this weekend?"', options: ['What', 'Who', 'How', 'Why'], correctIndex: 0, explanation: '"What are you doing...?" asks about someone\'s plans/activity.' },
+            { question: "I'm reading a fascinating book ___ — I'm only halfway through.", options: ['right now', 'at the moment', 'this second', 'currently now'], correctIndex: 1, explanation: '"At the moment" fits an ongoing project across days, not just this instant.' },
+            { question: '"Can I help you find something?" — "___, thanks, I\'m just looking."', options: ['No', "I don't", "I'm not", 'Not really'], correctIndex: 0, explanation: '"No, I\'m just looking, thanks" is the natural polite reply while browsing.' },
+            { question: '"Are they staying for dinner?" — "Yes, ___."', options: ['they stay', 'they are', 'they do', 'they staying'], correctIndex: 1, explanation: 'Short answer for a continuous question: "Yes, they are."' },
+            { type: 'fill', question: 'Short answer: "Is she working?" — "Yes, she ___." (one word)', answer: 'is', explanation: 'Short answers for continuous questions repeat "to be": "Yes, she is."' },
+          ],
+        },
+      ],
+    },
+  },
+  {
     title: 'Present Continuous Tense — Intermediate',
     description: 'The passive continuous, developing trends, and how it splits from "going to" and "will".',
     duration: 20,

@@ -92,6 +92,80 @@ module.exports = [
     },
   },
   {
+    title: 'Present Perfect Tense — Elementary',
+    description: 'Have you ever...? — talking about life experiences with confidence.',
+    duration: 20,
+    content: {
+      intro:
+        '"Have you ever...?" is one of the most useful questions in English — a great way to start conversations and get to know someone. Let\'s build a real toolkit of irregular participles and practise using it naturally.',
+      sections: [
+        {
+          type: 'rule',
+          title: 'Talking about experiences',
+          points: [
+            '"Have you ever...?" asks about experience at any point in your life — "Have you ever been to Japan?"',
+            'Answer with "Yes, I have" / "No, I haven\'t/never have" — not the full sentence repeated.',
+            '"This is the first/second/third time..." + present perfect highlights how many times something has happened — "This is the first time I\'ve tried sushi."',
+            'You don\'t need "ever" in the affirmative — only in questions and with "never" — "I have been to Rome" (no "ever" needed).',
+          ],
+        },
+        {
+          type: 'table',
+          title: 'The irregular participles you\'ll use most',
+          headers: ['Base form', 'Past participle', 'Example'],
+          rows: [
+            ['go', 'been / gone', 'I have been to Kenya.'],
+            ['see', 'seen', 'Have you seen this film?'],
+            ['eat', 'eaten', "I've never eaten octopus."],
+            ['do', 'done', "She's done this exercise before."],
+            ['make', 'made', "We've made this mistake before."],
+            ['write', 'written', "He's written three books."],
+            ['read', 'read', "I've read that one already."],
+            ['buy', 'bought', "I've just bought a new phone."],
+            ['break', 'broken', "I've broken my arm before."],
+            ['take', 'taken', "She's taken this route many times."],
+          ],
+        },
+        {
+          type: 'phrases',
+          title: 'Short answers and follow-ups',
+          items: [
+            phrase('Yes, I have.', 'Confirms you have this experience', ''),
+            phrase("No, I haven't.", 'You don\'t have this experience', ''),
+            phrase('No, never!', 'A stronger, more emphatic "no"', ''),
+            phrase('How many times?', 'A natural follow-up question', ''),
+          ],
+        },
+        {
+          type: 'tip',
+          variant: 'warning',
+          title: 'Common mistake',
+          body:
+            'Don\'t add "ever" to a positive statement: "I have ever visited London" ✗ is wrong. "Ever" belongs in questions ("Have you ever...?") and negatives with "never" ("I have never visited London"). A simple positive statement just says "I have visited London."',
+        },
+        {
+          type: 'tip',
+          variant: 'info',
+          title: 'Memory trick',
+          body:
+            'Learn irregular participles in pairs you can picture: go→been/gone (a trip), see→seen (a film), eat→eaten (a meal), make→made (a mistake). Attaching a mini scene to each one makes them stick.',
+        },
+        {
+          type: 'practice',
+          title: 'Quick check',
+          questions: [
+            { question: 'Have you ever ___ (eat) snails?', options: ['ate', 'eat', 'eaten', 'eating'], correctIndex: 2, explanation: 'Present perfect uses the past participle: "eaten".' },
+            { question: '"Have you been to Paris?" — "___"', options: ['Yes, I do.', 'Yes, I have.', 'Yes, I am.', 'Yes, I was.'], correctIndex: 1, explanation: 'The short answer to a present perfect question repeats "have": "Yes, I have."' },
+            { question: 'This is the ___ time I\'ve visited this museum.', options: ['one', 'first', 'once', 'firstly'], correctIndex: 1, explanation: '"This is the first time..." is the standard pattern with present perfect.' },
+            { question: 'I ___ (never/break) a bone.', options: ['have never broken', 'never have broken', 'have ever broken', 'never broke'], correctIndex: 0, explanation: '"Never" goes between "have" and the past participle: "have never broken".' },
+            { question: 'She ___ (write) three novels so far.', options: ['wrote', 'writes', 'has written', 'is writing'], correctIndex: 2, explanation: '"So far" signals present perfect for an ongoing count of achievements: "has written".' },
+            { type: 'fill', question: 'Complete: Have you ever ___ to Italy? (one word — past participle of "go")', answer: 'been', explanation: '"Have you been to...?" is the standard experience question.' },
+          ],
+        },
+      ],
+    },
+  },
+  {
     title: 'Present Perfect Tense — Intermediate',
     description: 'Superlatives, "How many times", passive form, and where already/yet/still go.',
     duration: 20,

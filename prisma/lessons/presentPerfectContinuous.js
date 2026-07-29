@@ -81,6 +81,72 @@ module.exports = [
     },
   },
   {
+    title: 'Present Perfect Continuous Tense — Elementary',
+    description: '"How long...?" — everyday scenes where this tense feels natural.',
+    duration: 20,
+    content: {
+      intro:
+        "This tense can feel abstract at first, so let's ground it in scenes you already recognize: small talk about the weather, being tired after exercise, and answering \"how long\" questions about things you're still doing.",
+      sections: [
+        {
+          type: 'rule',
+          title: 'Everyday scenes for this tense',
+          points: [
+            'Small talk about ongoing weather — "It\'s been raining all morning."',
+            'Explaining why you look a certain way right now — "I\'ve been exercising, that\'s why I\'m out of breath."',
+            'Talking about a hobby or study project you\'re in the middle of — "I\'ve been learning Spanish for six months."',
+            '"How long...?" is the question this tense was built to answer — "How long have you been waiting?"',
+          ],
+        },
+        {
+          type: 'structure',
+          title: 'Answering "how long"',
+          structureItems: [
+            { label: 'The question', pattern: 'How long + have/has + subject + been + verb-ing?', example: 'How long have you been learning English?' },
+            { label: 'With "for"', pattern: 'Subject + have/has + been + verb-ing + for + duration', example: "I've been learning English for two years." },
+            { label: 'With "since"', pattern: 'Subject + have/has + been + verb-ing + since + point in time', example: "I've been learning English since 2024." },
+          ],
+        },
+        {
+          type: 'phrases',
+          title: 'Everyday triggers for this tense',
+          items: [
+            phrase("I've been meaning to...", 'You intended to do something but haven\'t yet', ''),
+            phrase("That's why I've been...", 'Explains the reason behind a visible result', ''),
+            phrase('all morning / all day / all week', 'Emphasizes a long, unbroken stretch of time', ''),
+            phrase("How's it going?", 'A casual way to ask about an ongoing project', ''),
+          ],
+        },
+        {
+          type: 'tip',
+          variant: 'warning',
+          title: 'Common mistake',
+          body:
+            'Don\'t drop "been": "I have exercising" ✗ is missing a piece. The full form always needs all three parts: have/has + BEEN + verb-ing — "I have been exercising" ✓.',
+        },
+        {
+          type: 'tip',
+          variant: 'info',
+          title: 'Memory trick',
+          body:
+            'If you can picture the activity still happening as you speak, or its effects are visible right now (sweat, tiredness, a half-finished project), this tense almost always fits.',
+        },
+        {
+          type: 'practice',
+          title: 'Quick check',
+          questions: [
+            { question: "It ___ (rain) all morning — look how wet the streets are.", options: ['rains', 'has rained', 'has been raining', 'is raining'], correctIndex: 2, explanation: 'An ongoing weather situation with a visible result → "has been raining".' },
+            { question: '"___ have you been learning the guitar?" — "For about a year."', options: ['How long', 'How much', 'How many', 'How often'], correctIndex: 0, explanation: '"How long" asks about duration — the classic present perfect continuous question.' },
+            { question: "I'm exhausted — I ___ (study) since 6am.", options: ['study', 'studied', 'have been studying', 'am studying'], correctIndex: 2, explanation: 'A visible present result (exhaustion) from an ongoing activity → present perfect continuous.' },
+            { question: "I've ___ (mean) to call you all week!", options: ['mean', 'meant', 'been meaning', 'meaning'], correctIndex: 2, explanation: '"I\'ve been meaning to..." is a fixed everyday expression using this tense.' },
+            { question: 'She ___ (learn) Spanish for six months now.', options: ['learns', 'learned', 'has been learning', 'is learning'], correctIndex: 2, explanation: 'An ongoing hobby/project measured by duration ("for six months") → present perfect continuous.' },
+            { type: 'fill', question: 'Complete: I have ___ waiting for an hour! (the missing word)', answer: 'been', explanation: 'The full form always needs all three parts: have + been + verb-ing.' },
+          ],
+        },
+      ],
+    },
+  },
+  {
     title: 'Present Perfect Continuous Tense — Intermediate',
     description: '"How long" as your main tool, negative form nuance, and reinforcing for vs. since.',
     duration: 20,

@@ -367,10 +367,33 @@ const COURSES = [
               ],
             },
             {
+              type: 'table',
+              title: 'Bonus: tag questions across the tenses',
+              headers: ['Tense', 'Statement', 'Tag question'],
+              rows: [
+                ['Present simple', 'She works here,', "doesn't she?"],
+                ['Present continuous', "You're coming,", "aren't you?"],
+                ['Present perfect', "He's finished,", "hasn't he?"],
+                ['Present perfect continuous', "They've been waiting,", "haven't they?"],
+              ],
+            },
+            {
+              type: 'tip',
+              variant: 'info',
+              title: 'How tag questions work',
+              body: 'A positive statement gets a negative tag; a negative statement gets a positive tag. The tag always borrows the SAME auxiliary as the main verb — do/does, am/is/are, or have/has — which is exactly why it\'s worth knowing all four tenses well.',
+            },
+            {
               type: 'tip',
               variant: 'info',
               title: 'Quick decision guide',
               body: "Ask yourself: Is it a HABIT or FACT? → present simple. Is it happening RIGHT NOW or temporary? → present continuous. Is it a RESULT or an experience with no specific time? → present perfect. Is it about ongoing DURATION or a process? → present perfect continuous.",
+            },
+            {
+              type: 'tip',
+              variant: 'warning',
+              title: 'For French speakers: two traps to watch for',
+              body: 'French "passé composé" (j\'ai vu) looks just like the present perfect (I have seen), but French uses it for finished past time too — "I have seen him yesterday" ✗ is a classic slip; English needs the past simple once a specific time is named: "I saw him yesterday" ✓. Second: French says "depuis" with the present tense ("je travaille ici depuis 2020"), which produces "I work here since 2020" ✗ — English needs the present perfect for this: "I have worked here since 2020" ✓.',
             },
             {
               type: 'practice',
@@ -382,6 +405,8 @@ const COURSES = [
                 { question: 'We ___ (wait) for the bus for 20 minutes already.', options: ['wait', 'are waiting', 'have waited', 'have been waiting'], correctIndex: 3, explanation: 'Duration up to now, still ongoing → present perfect continuous.' },
                 { question: 'The Earth ___ (orbit) the sun.', options: ['orbits', 'is orbiting', 'has orbited', 'has been orbiting'], correctIndex: 0, explanation: 'A permanent scientific fact → present simple.' },
                 { question: 'She ___ (live) in Paris since 2015.', options: ['lives', 'is living', 'has lived', 'is live'], correctIndex: 2, explanation: '"Since" + an unspecified ongoing fact → present perfect.' },
+                { question: 'She works here, ___?', options: ["doesn't she", "isn't she", "does she", "hasn't she"], correctIndex: 0, explanation: 'Present simple affirmative → negative tag with "doesn\'t".' },
+                { type: 'fill', question: 'Correct the French-speaker slip: "I have seen him yesterday." → "I ___ him yesterday." (past simple)', answer: 'saw', explanation: 'A specific past time ("yesterday") needs the past simple, not the present perfect.' },
               ],
             },
           ],

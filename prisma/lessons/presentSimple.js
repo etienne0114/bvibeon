@@ -45,6 +45,16 @@ module.exports = [
           ],
         },
         {
+          type: 'table',
+          title: 'Short answers',
+          headers: ['Question', 'Short answer (yes)', 'Short answer (no)'],
+          rows: [
+            ['Do you like coffee?', 'Yes, I do.', "No, I don't."],
+            ['Does she work here?', 'Yes, she does.', "No, she doesn't."],
+            ['Do they live nearby?', 'Yes, they do.', "No, they don't."],
+          ],
+        },
+        {
           type: 'phrases',
           title: 'Signal words',
           items: [
@@ -80,6 +90,7 @@ module.exports = [
             { question: 'He ___ like spicy food.', options: ["don't", "doesn't", "isn't", 'not'], correctIndex: 1, explanation: 'Negative with he/she/it: doesn\'t + base verb (no extra -s).' },
             { question: 'Which sentence is correct?', options: ['She go to school by bus.', 'She goes to school by bus.', 'She going to school by bus.', 'She is go to school by bus.'], correctIndex: 1, explanation: '"go" ends in -o, so add -es: goes.' },
             { question: 'The train ___ at 9am every day.', options: ['leave', 'leaves', 'is leaving', 'left'], correctIndex: 1, explanation: 'Fixed schedules use the present simple: "leaves."' },
+            { question: '"Does he speak German?" — "No, ___."', options: ['he not', "he doesn't", "he don't", 'not he'], correctIndex: 1, explanation: 'Short answers repeat "do/does": "No, he doesn\'t."' },
           ],
         },
       ],
@@ -179,6 +190,7 @@ module.exports = [
             'Zero conditional: if/when + present simple, present simple result — for things that are always true. "If you heat ice, it melts."',
             'Time clauses about the future use the present simple, never "will" — "I\'ll call you when I arrive" (not "will arrive").',
             'Subject questions (asking "who/what" AS the subject) skip do/does entirely — "Who lives here?" not "Who does live here?"',
+            'A passive form exists too, for facts about processes and general truths where WHO does the action barely matters — "English is spoken here." "These cars are made in Japan."',
           ],
         },
         {
@@ -188,6 +200,7 @@ module.exports = [
             { label: 'Before the main verb', pattern: 'Subject + frequency adverb + verb', example: 'She usually walks to work.' },
             { label: 'After "to be"', pattern: 'Subject + am/is/are + frequency adverb', example: 'He is often late.' },
             { label: 'Subject questions (no do/does)', pattern: 'Who/What + verb(+s)...?', example: 'Who knows the answer? What happens next?' },
+            { label: 'Passive', pattern: 'Subject + am/is/are + past participle', example: 'The shop opens at 9. → The shop is opened at 9 (by the manager).' },
           ],
         },
         {
@@ -233,6 +246,7 @@ module.exports = [
             { question: 'She ___ (be) usually the first to arrive.', options: ['usually is', 'is usually', 'is being usually', 'usually be'], correctIndex: 1, explanation: 'Frequency adverbs go AFTER "to be": "is usually".' },
             { question: 'If you mix blue and yellow, it ___ (make) green.', options: ['will make', 'made', 'makes', 'is making'], correctIndex: 2, explanation: 'Zero conditional: if + present simple, present simple result.' },
             { question: "I'll text you when I ___ (arrive).", options: ['will arrive', 'arrive', 'am arriving', 'arrived'], correctIndex: 1, explanation: 'Time clauses about the future use present simple, not "will".' },
+            { question: 'Which sentence is passive?', options: ['The bakery makes fresh bread every day.', 'Fresh bread is made every day.', 'The bakery is making fresh bread.', 'The bakery has made fresh bread.'], correctIndex: 1, explanation: 'Passive present simple: subject + am/is/are + past participle, with no need to say who does it.' },
           ],
         },
       ],
@@ -255,6 +269,7 @@ module.exports = [
             'Reporting research and general findings in academic writing — "The study shows a clear correlation." / "Researchers argue that the effect is temporary."',
             'Headlines and live commentary use their own present-simple register — "Storm hits coast" (headline); "He shoots... he scores!" (commentary).',
             'A small set of verbs shift meaning between simple and continuous ("dual-nature" verbs) — the form you choose changes what you mean.',
+            'Negative questions aren\'t really asking — they express surprise, or invite agreement — "Don\'t you love this song?" (I\'m sure you do) / "Doesn\'t she look happy today?"',
           ],
         },
         {
@@ -291,6 +306,7 @@ module.exports = [
             { question: "Which sentence uses 'have' correctly for possession?", options: ["I'm having two brothers.", 'I have two brothers.', 'I have having two brothers.', 'I am have two brothers.'], correctIndex: 1, explanation: 'Possession is a state → present simple: "I have two brothers."' },
             { question: 'The report ___ (show) a 20% increase in sales.', options: ['is showing', 'shows', 'showed', 'has been showing'], correctIndex: 1, explanation: 'Reporting research findings uses the present simple: "shows".' },
             { question: "I'm sorry, I ___ (not/see) what you mean.", options: ['am not seeing', "don't see", "didn't see", "haven't seen"], correctIndex: 1, explanation: '"See" meaning "understand" is a state verb → present simple, not continuous.' },
+            { question: 'Which negative question expresses genuine surprise, not just a yes/no question?', options: ['Do you like pizza?', "Don't you love this song? I thought everyone did!", 'Does he work here?', 'Do they live nearby?'], correctIndex: 1, explanation: 'Negative questions like this invite agreement or express surprise, rather than asking for new information.' },
           ],
         },
       ],

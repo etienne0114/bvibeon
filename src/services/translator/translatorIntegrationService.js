@@ -10,8 +10,16 @@ const logger = require('../../utils/logger');
 class TranslatorIntegrationService {
   constructor() {
     this.translatorBaseUrl = process.env.TRANSLATOR_API_URL || 'https://etienne0114-vibeon-translator.hf.space';
-    // Use the vibeon_translator service's secret key (matches SECRET_KEY set in HF Space secrets)
-    this.apiSecret = process.env.TRANSLATOR_SECRET_KEY || '509a213999016c5a5d97bc9f981a151fceb05a2759a1fa0d9b55de2fdcb2df94';
+    // Use the vibeon_translator service's secret key (matches SECRET_KEY set in HF Space secrets).
+    // No hardcoded fallback — this repo is public, so a baked-in default would
+    // be a publicly-known signing key. If it's ever missing, jwt.sign() below
+    // throws and callers' existing try/catch fallbacks handle it, same as any
+    // other translator-unavailable case (this integration is designed to
+    // degrade gracefully, not to crash the app).
+    this.apiSecret = process.env.TRANSLATOR_SECRET_KEY || '';
+    if (!this.apiSecret) {
+      logger.warn('TRANSLATOR_SECRET_KEY is not set — translator-authenticated requests will fail until it is configured.');
+    }
     this.algorithm = process.env.TRANSLATOR_ALGORITHM || 'HS256';
     // Default timeout; some ML operations (OCR, long translations) need longer
     this.timeout = parseInt(process.env.TRANSLATION_TIMEOUT || '120000');

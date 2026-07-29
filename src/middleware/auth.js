@@ -1,7 +1,14 @@
 const jwt = require('jsonwebtoken');
 const prisma = require('../utils/prismaClient');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'learn-jwt-secret';
+// No fallback: this repo is public, so any hardcoded default would be a
+// publicly-known signing secret, letting anyone forge a valid token for any
+// userId. Fail loudly at startup instead of silently signing/verifying
+// tokens with a secret the whole world can read on GitHub.
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required and must not be empty.');
+}
 
 async function auth(req, res, next) {
   try {

@@ -14,7 +14,27 @@ const app = express();
 // Behind Vercel/most proxies: needed so rate limiting sees the real client IP
 app.set('trust proxy', 1);
 app.use(helmet());
-app.use(cors());
+
+// Auth uses Bearer tokens (not cookies), so an open CORS policy can't be used
+// for CSRF/session hijacking — but restricting it anyway is a free, low-risk
+// hardening step: it stops other websites' browser JS from probing this API
+// with a leaked/copied token. Requests with no Origin header (server-to-
+// server calls, curl, mobile apps) are unaffected — CORS only applies to
+// browsers.
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'https://fvibeon.vercel.app',
+  'http://localhost:4200',
+  'http://localhost:5173',
+].filter(Boolean);
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+      callback(new Error('Not allowed by CORS'));
+    },
+  }),
+);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('combined', { stream: logger.stream }));

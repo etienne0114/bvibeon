@@ -26,3 +26,6 @@ src/generated/
 .vercel/
 .vercel
 .env*
+
+# Supabase CLI local link cache — not project config, just this machine's state
+supabase/.temp/

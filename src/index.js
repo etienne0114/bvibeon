@@ -30,8 +30,11 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-      callback(new Error('Not allowed by CORS'));
+      // false (not an Error) — omits CORS headers so the browser blocks the
+      // response client-side, without throwing into a 500 that would show
+      // up as a fake server error in logs/monitoring for what's actually
+      // just a disallowed origin behaving exactly as designed.
+      callback(null, !origin || allowedOrigins.includes(origin));
     },
   }),
 );

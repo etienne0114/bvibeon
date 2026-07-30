@@ -18,6 +18,10 @@ const pastSimpleLessons = require('./lessons/pastSimple');
 const pastContinuousLessons = require('./lessons/pastContinuous');
 const pastPerfectLessons = require('./lessons/pastPerfect');
 const pastPerfectContinuousLessons = require('./lessons/pastPerfectContinuous');
+const futureSimpleLessons = require('./lessons/futureSimple');
+const futureContinuousLessons = require('./lessons/futureContinuous');
+const futurePerfectLessons = require('./lessons/futurePerfect');
+const futurePerfectContinuousLessons = require('./lessons/futurePerfectContinuous');
 
 const COURSES = [
   {
@@ -518,6 +522,98 @@ const COURSES = [
       ['by the time', 'Past perfect signal word: introduces the later reference point'],
       ['used to', 'Describes a past habit or state that no longer holds'],
       ['how long', 'Past perfect continuous signal word: asks about duration before a past point'],
+    ].map(([word, definition]) => ({ word, definition, language: 'en' })),
+  },
+  {
+    title: 'English Grammar: Future Tenses',
+    description: 'Future simple, continuous, perfect, and perfect continuous — each one taught at beginner, elementary, intermediate, and advanced level, with an interactive check throughout, and a side-by-side comparison to lock it all in.',
+    level: 'BEGINNER',
+    category: 'LANGUAGE',
+    estimatedDuration: 340,
+    imageUrl: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800',
+    tags: JSON.stringify(['grammar', 'tenses', 'english', 'future']),
+    lessons: [
+      ...futureSimpleLessons,
+      ...futureContinuousLessons,
+      ...futurePerfectLessons,
+      ...futurePerfectContinuousLessons,
+      {
+        title: 'Future Tenses Compared',
+        description: 'All four future tenses, side by side — the fastest way to stop confusing them.',
+        duration: 15,
+        content: {
+          intro: "You've learned all four future tenses individually — now let's put them side by side. Seeing the contrast directly, with the same verb across all four, is the fastest way to make the differences stick.",
+          sections: [
+            {
+              type: 'table',
+              title: 'The four future tenses at a glance',
+              headers: ['Tense', 'Focus', 'Example'],
+              rows: [
+                ['Future simple', 'Decisions, predictions, promises, plain facts', 'She will call you.'],
+                ['Future continuous', 'In progress at a specific future moment', 'She will be calling clients at 3pm.'],
+                ['Future perfect', 'Completed by a specific future point', 'She will have called everyone by 5pm.'],
+                ['Future perfect continuous', 'Duration or process up to a future point', 'She will have been calling clients for two hours by 5pm.'],
+              ],
+            },
+            {
+              type: 'table',
+              title: 'Same verb, four meanings',
+              headers: ['Tense', 'Sentence', 'Meaning'],
+              rows: [
+                ['Future simple', 'He will write a report.', 'A plain future action or decision.'],
+                ['Future continuous', 'He will be writing the report at 3pm.', 'In progress at that specific moment.'],
+                ['Future perfect', 'He will have written the report by Friday.', 'Completed by a future deadline.'],
+                ['Future perfect continuous', 'He will have been writing the report for a week by Friday.', 'The ongoing process/duration before that point.'],
+              ],
+            },
+            {
+              type: 'table',
+              title: 'Bonus: tag questions across the tenses',
+              headers: ['Tense', 'Statement', 'Tag question'],
+              rows: [
+                ["Future simple", "She'll call you,", "won't she?"],
+                ['Future continuous', "You'll be staying,", "won't you?"],
+                ['Future perfect', "He'll have finished,", "won't he?"],
+                ['Future perfect continuous', "They'll have been waiting,", "won't they?"],
+              ],
+            },
+            {
+              type: 'tip',
+              variant: 'info',
+              title: 'Quick decision guide',
+              body: "Ask yourself: Is it a decision, prediction, or promise? → future simple. Will it be in progress at a specific future moment? → future continuous. Will it be finished BY a future point? → future perfect. Will it be an ongoing duration or process reaching that point? → future perfect continuous.",
+            },
+            {
+              type: 'tip',
+              variant: 'warning',
+              title: 'The universal trap: "will" in time clauses',
+              body: 'Every single future tense shares the same rule, and it\'s the most common future-tense mistake in English: a time clause after when/after/before/as soon as/until always stays in the PRESENT simple, never "will" — "I\'ll text you when I will arrive" ✗ is wrong no matter which future tense the main clause uses. "I\'ll text you when I arrive" ✓.',
+            },
+            {
+              type: 'practice',
+              title: 'Mixed review',
+              questions: [
+                { question: "The phone's ringing — I ___ (answer) it.", options: ['will answer', 'will be answering', 'will have answered', 'will have been answering'], correctIndex: 0, explanation: 'A spontaneous decision made right now → future simple.' },
+                { question: 'This time next week, I ___ (relax) on a beach.', options: ['will relax', 'will be relaxing', 'will have relaxed', 'will have been relaxing'], correctIndex: 1, explanation: 'In progress at a specific future moment → future continuous.' },
+                { question: 'By 2030, scientists ___ (discover) a cure.', options: ['will discover', 'will be discovering', 'will have discovered', 'will have been discovering'], correctIndex: 2, explanation: 'A confirmed result by a future point → future perfect.' },
+                { question: 'By then, I ___ (study) medicine for six years.', options: ['will study', 'will be studying', 'will have studied', 'will have been studying'], correctIndex: 3, explanation: 'Duration reaching a future point, emphasized by "for six years" → future perfect continuous.' },
+                { question: "You'll be coming to the wedding, ___?", options: ["won't you", "don't you", "aren't you", "haven't you"], correctIndex: 0, explanation: 'The tag question borrows the same auxiliary as the statement: "won\'t you?"' },
+                { question: "I'll call you when I ___ (arrive).", options: ['will arrive', 'arrive', 'am arriving', 'arrived'], correctIndex: 1, explanation: 'Future time clauses always use the present simple, never "will".' },
+                { question: 'By the time she retires, she ___ (work) here for 25 years.', options: ['will work', 'will be working', 'will have worked', 'will have been working'], correctIndex: 3, explanation: 'A long duration reaching a future milestone → future perfect continuous.' },
+                { type: 'fill', question: "Correct the classic mistake: \"I'll text you when I will arrive.\" → The natural version is: \"I'll text you when I ___.\" (one word)", answer: 'arrive', explanation: 'Future time clauses always stay in the present simple, no matter which future tense the main clause uses.' },
+              ],
+            },
+          ],
+        },
+      },
+    ],
+    vocabulary: [
+      ['tomorrow', 'Future simple signal word: the day after today'],
+      ['soon', 'Future simple signal word: in the near future'],
+      ['by the time', 'Future perfect signal word: introduces the future reference point'],
+      ['this time next week', 'Future continuous signal word: the same future moment, one week ahead'],
+      ['going to', 'Signals a plan already decided, or a prediction from present evidence'],
+      ['how long', 'Future perfect continuous signal word: asks about duration up to a future point'],
     ].map(([word, definition]) => ({ word, definition, language: 'en' })),
   },
   {

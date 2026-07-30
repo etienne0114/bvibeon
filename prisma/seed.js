@@ -14,6 +14,10 @@ const presentSimpleLessons = require('./lessons/presentSimple');
 const presentContinuousLessons = require('./lessons/presentContinuous');
 const presentPerfectLessons = require('./lessons/presentPerfect');
 const presentPerfectContinuousLessons = require('./lessons/presentPerfectContinuous');
+const pastSimpleLessons = require('./lessons/pastSimple');
+const pastContinuousLessons = require('./lessons/pastContinuous');
+const pastPerfectLessons = require('./lessons/pastPerfect');
+const pastPerfectContinuousLessons = require('./lessons/pastPerfectContinuous');
 
 const COURSES = [
   {
@@ -422,6 +426,98 @@ const COURSES = [
       ['since', 'Present perfect signal word: marks the starting point of a continuing action (since 2020)'],
       ['recently', 'Present perfect continuous signal word: not long ago, often still relevant'],
       ['still', 'Present perfect continuous signal word: the activity has not stopped'],
+    ].map(([word, definition]) => ({ word, definition, language: 'en' })),
+  },
+  {
+    title: 'English Grammar: Past Tenses',
+    description: 'Past simple, continuous, perfect, and perfect continuous — each one taught at beginner, elementary, intermediate, and advanced level, with an interactive check throughout, and a side-by-side comparison to lock it all in.',
+    level: 'BEGINNER',
+    category: 'LANGUAGE',
+    estimatedDuration: 340,
+    imageUrl: 'https://images.unsplash.com/photo-1461360370896-922624d12aa1?w=800',
+    tags: JSON.stringify(['grammar', 'tenses', 'english', 'past']),
+    lessons: [
+      ...pastSimpleLessons,
+      ...pastContinuousLessons,
+      ...pastPerfectLessons,
+      ...pastPerfectContinuousLessons,
+      {
+        title: 'Past Tenses Compared',
+        description: 'All four past tenses, side by side — the fastest way to stop confusing them.',
+        duration: 15,
+        content: {
+          intro: "You've learned all four past tenses individually — now let's put them side by side. Seeing the contrast directly, with the same verb across all four, is the fastest way to make the differences stick.",
+          sections: [
+            {
+              type: 'table',
+              title: 'The four past tenses at a glance',
+              headers: ['Tense', 'Focus', 'Example'],
+              rows: [
+                ['Past simple', 'Completed actions, sequences, facts no longer true', 'She worked in Kigali.'],
+                ['Past continuous', 'In progress at a specific past moment, background/scene-setting', 'She was working at 8pm.'],
+                ['Past perfect', 'Completed before another past point — the "past before the past"', 'She had worked there for years before she left.'],
+                ['Past perfect continuous', 'Duration or process before another past point', 'She had been working there since 2015 when it closed.'],
+              ],
+            },
+            {
+              type: 'table',
+              title: 'Same verb, four meanings',
+              headers: ['Tense', 'Sentence', 'Meaning'],
+              rows: [
+                ['Past simple', 'He wrote a novel.', 'A single finished achievement.'],
+                ['Past continuous', 'He was writing a novel when I called.', 'In progress at that moment — background.'],
+                ['Past perfect', 'He had written a novel before he turned 20.', 'Completed before another past point.'],
+                ['Past perfect continuous', 'He had been writing the novel for two years when he gave up.', 'The ongoing process/duration before that point.'],
+              ],
+            },
+            {
+              type: 'table',
+              title: 'Bonus: tag questions across the tenses',
+              headers: ['Tense', 'Statement', 'Tag question'],
+              rows: [
+                ['Past simple', 'She worked here,', "didn't she?"],
+                ['Past continuous', 'You were watching,', "weren't you?"],
+                ['Past perfect', "He'd finished,", "hadn't he?"],
+                ['Past perfect continuous', "They'd been waiting,", "hadn't they?"],
+              ],
+            },
+            {
+              type: 'tip',
+              variant: 'info',
+              title: 'Quick decision guide',
+              body: "Ask yourself: Is it a finished action or sequence? → past simple. Was it in progress at a specific moment, or setting the scene? → past continuous. Did it happen before another past event (a result)? → past perfect. Was it an ongoing duration or process before that other past point? → past perfect continuous.",
+            },
+            {
+              type: 'tip',
+              variant: 'warning',
+              title: 'The universal trap: over-using "had"',
+              body: 'Once "had" starts to feel natural, it\'s tempting to use it for every past sentence out of caution. "I had woken up and had eaten breakfast before school" ✗ over-marks two ordinary sequential actions. Plain past simple is correct here: "I woke up and ate breakfast before school" ✓. Save "had" for when the ORDER of two past events genuinely needs clarifying.',
+            },
+            {
+              type: 'practice',
+              title: 'Mixed review',
+              questions: [
+                { question: 'While I ___ (study), my phone ___ (ring).', options: ['was studying / rang', 'studied / was ringing', 'was studying / was ringing', 'studied / rang'], correctIndex: 0, explanation: 'Background action in progress (continuous) interrupted by a shorter event (simple).' },
+                { question: 'By the time we arrived, the film ___ (already/start).', options: ['already started', 'had already started', 'has already started', 'was already starting'], correctIndex: 1, explanation: 'Completed before another past point → past perfect.' },
+                { question: 'She ___ (live) in Nairobi for six years before she moved to Kigali.', options: ['lived', 'was living', 'had been living', 'has lived'], correctIndex: 2, explanation: 'Duration/process before another past event (moving) → past perfect continuous.' },
+                { question: 'He ___ (finish) his homework, so he went out to play.', options: ['finished', 'had finished', 'has finished', 'was finishing'], correctIndex: 1, explanation: 'Completed before the next past action (going out) → past perfect.' },
+                { question: 'Last night at 9pm, I ___ (watch) my favorite show.', options: ['watched', 'was watching', 'had watched', 'have watched'], correctIndex: 1, explanation: 'A specific past moment, action in progress → past continuous.' },
+                { question: 'They ___ (already/leave) when we ___ (get) there.', options: ['already left / got', 'had already left / got', 'already left / had gotten', 'had already left / had got'], correctIndex: 1, explanation: 'The earlier event (leaving) takes past perfect; the later one (getting there) takes plain past simple.' },
+                { question: 'He finished the race, ___?', options: ["doesn't he", "didn't he", "hasn't he", "wasn't he"], correctIndex: 1, explanation: 'The tag question borrows the same auxiliary as a past simple statement: "didn\'t he?"' },
+                { type: 'fill', question: "Correct the overcorrection: \"I had woken up and had eaten breakfast before school.\" → The natural version is: \"I ___ up and ate breakfast before school.\" (one word)", answer: 'woke', explanation: 'A simple past sequence with no second reference point just needs plain past simple: "woke up and ate breakfast".' },
+              ],
+            },
+          ],
+        },
+      },
+    ],
+    vocabulary: [
+      ['ago', 'Past simple signal word: counts backward from now (two days ago)'],
+      ['already', 'Past perfect signal word: before the other past event, often sooner than expected'],
+      ['while', 'Past continuous signal word: marks a background action alongside another'],
+      ['by the time', 'Past perfect signal word: introduces the later reference point'],
+      ['used to', 'Describes a past habit or state that no longer holds'],
+      ['how long', 'Past perfect continuous signal word: asks about duration before a past point'],
     ].map(([word, definition]) => ({ word, definition, language: 'en' })),
   },
   {

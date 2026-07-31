@@ -1,5 +1,6 @@
 const prisma = require('../utils/prismaClient');
 const logger = require('../utils/logger');
+const certificateService = require('./certificateService');
 
 /**
  * Progress Service
@@ -84,6 +85,9 @@ class ProgressService {
           'Completed a full course. Komera!',
           200,
         ).catch(() => undefined);
+        certificateService
+          .generateCourseCertificate(userId, progress.lesson.courseId)
+          .catch((err) => logger.error('Auto-issue certificate error:', err));
       }
 
       return { ...progress, courseProgress: enrollment?.progress ?? null };

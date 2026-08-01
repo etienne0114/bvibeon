@@ -87,7 +87,7 @@ function welcomeTemplate(username) {
         3. Ask the AI tutor anything — it never judges
       </p>
     </div>
-    <a href="https://fvibeon.vercel.app" style="display:inline-block;background:${brand.ink};color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:999px;font-size:15px;font-weight:bold;">
+    <a href="https://fvibeon.vercel.app/#auth" style="display:inline-block;background:${brand.ink};color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:999px;font-size:15px;font-weight:bold;">
       Start learning
     </a>`);
 }
@@ -209,7 +209,7 @@ function reEngagementTemplate(username, daysInactive, streakDays) {
     <p style="color:${brand.inkSoft};font-size:15px;line-height:1.7;margin:0 0 24px;">
       Just 5 minutes today keeps your progress moving — no pressure, just pick up where you left off.
     </p>
-    <a href="https://fvibeon.vercel.app" style="display:inline-block;background:${brand.ink};color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:999px;font-size:15px;font-weight:bold;">
+    <a href="https://fvibeon.vercel.app/#auth" style="display:inline-block;background:${brand.ink};color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:999px;font-size:15px;font-weight:bold;">
       Continue learning
     </a>`);
 }

@@ -85,7 +85,10 @@ class ProgressService {
           'Completed a full course. Komera!',
           200,
         ).catch(() => undefined);
-        certificateService
+        // Awaited (not fire-and-forget): on Vercel's serverless runtime the
+        // function can freeze immediately after the HTTP response is sent,
+        // so an un-awaited promise here is not guaranteed to ever finish.
+        await certificateService
           .generateCourseCertificate(userId, progress.lesson.courseId)
           .catch((err) => logger.error('Auto-issue certificate error:', err));
       }

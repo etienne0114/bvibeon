@@ -1,6 +1,7 @@
 const prisma = require('../utils/prismaClient');
 const logger = require('../utils/logger');
 const certificateService = require('./certificateService');
+const emailService = require('./emailService');
 
 /**
  * Progress Service
@@ -152,6 +153,10 @@ class ProgressService {
    * the connection pool.
    */
   async getStatsAndActivity(userId) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { streakFreezes: true, streakFreezeDates: true, streakFreezeMilestone: true },
+    });
     const [statsResult, activityResult] = await Promise.allSettled([
       prisma.$queryRaw`
         SELECT
@@ -187,15 +192,60 @@ class ProgressService {
       activityRows.map((r) => [new Date(r.day).toISOString().slice(0, 10), { minutes: r.minutes, lessons: r.lessons }]),
     );
 
-    // streak: consecutive days ending today or yesterday
+    // streak: consecutive days ending today or yesterday. A single missed
+    // day is auto-covered by a streak freeze if the learner has one
+    // available, instead of resetting the count to zero — Duolingo's #1
+    // retention mechanic, previously entirely absent here.
     let streak = 0;
+    let freezesAvailable = user?.streakFreezes ?? 1;
+    const freezeDatesUsed = new Set(Array.isArray(user?.streakFreezeDates) ? user.streakFreezeDates : []);
+    let freezeJustUsed = false;
     {
       const cursor = new Date();
-      if (!byDay.has(cursor.toISOString().slice(0, 10))) cursor.setDate(cursor.getDate() - 1);
-      while (byDay.has(cursor.toISOString().slice(0, 10))) {
-        streak += 1;
+      const todayKey = cursor.toISOString().slice(0, 10);
+      if (!byDay.has(todayKey)) cursor.setDate(cursor.getDate() - 1);
+      while (true) {
+        const key = cursor.toISOString().slice(0, 10);
+        if (byDay.has(key)) {
+          streak += 1;
+        } else if (freezeDatesUsed.has(key)) {
+          streak += 1;
+        } else if (freezesAvailable > 0 && key !== todayKey) {
+          freezesAvailable -= 1;
+          freezeDatesUsed.add(key);
+          freezeJustUsed = true;
+          streak += 1;
+        } else {
+          break;
+        }
         cursor.setDate(cursor.getDate() - 1);
       }
+    }
+
+    // Grant a fresh freeze every 7-day milestone the streak reaches, capped
+    // at holding 2 at once — rewards consistency instead of only protecting
+    // against lapses.
+    let milestone = user?.streakFreezeMilestone ?? 0;
+    let freezeJustGranted = false;
+    if (streak > 0 && streak % 7 === 0 && streak > milestone && freezesAvailable < 2) {
+      freezesAvailable += 1;
+      milestone = streak;
+      freezeJustGranted = true;
+    } else if (streak > milestone) {
+      milestone = streak;
+    }
+
+    if (user && (freezeJustUsed || freezeJustGranted || milestone !== user.streakFreezeMilestone)) {
+      await prisma.user
+        .update({
+          where: { id: userId },
+          data: {
+            streakFreezes: freezesAvailable,
+            streakFreezeDates: Array.from(freezeDatesUsed),
+            streakFreezeMilestone: milestone,
+          },
+        })
+        .catch((err) => logger.error('Persist streak freeze state error:', err));
     }
 
     // last 7 days, zero-filled
@@ -216,6 +266,9 @@ class ProgressService {
         completionRate: totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0,
         totalTimeMinutes: raw.total_time || 0,
         streakDays: streak,
+        streakFreezes: freezesAvailable,
+        streakFreezeJustUsed: freezeJustUsed,
+        streakFreezeJustGranted: freezeJustGranted,
       },
       courses: { enrolled: raw.enrolled || 0, completed: raw.completed_courses || 0 },
       quizzes: { totalAttempts: raw.quiz_attempts || 0 },
@@ -373,6 +426,45 @@ class ProgressService {
       logger.error('Get goals error:', error);
       return { goals: [], timeframe: 'monthly' };
     }
+  }
+
+  /**
+   * Find learners whose last lesson activity landed 3-4 days ago (a daily
+   * cron catches each lapsed learner in exactly one run) and who haven't
+   * been re-engagement-emailed in the last 7 days, then send the nudge.
+   * Returns a summary instead of throwing per-recipient — one bad email
+   * address must not abort the whole sweep.
+   */
+  async sendReEngagementEmails() {
+    const candidates = await prisma.$queryRaw`
+      SELECT u.id, u.email, u.username, u."firstName"
+      FROM "User" u
+      JOIN "LessonProgress" lp ON lp."userId" = u.id
+      WHERE u."lastReEngagementEmailAt" IS NULL OR u."lastReEngagementEmailAt" < NOW() - INTERVAL '7 days'
+      GROUP BY u.id
+      HAVING MAX(lp."lastAccessedAt") < NOW() - INTERVAL '3 days'
+         AND MAX(lp."lastAccessedAt") >= NOW() - INTERVAL '4 days'
+    `;
+
+    let sent = 0;
+    let failed = 0;
+    for (const candidate of candidates) {
+      try {
+        await emailService.sendReEngagementEmail({
+          to: candidate.email,
+          username: candidate.firstName || candidate.username,
+          daysInactive: 3,
+          streakDays: 0,
+        });
+        await prisma.user.update({ where: { id: candidate.id }, data: { lastReEngagementEmailAt: new Date() } });
+        sent += 1;
+      } catch (error) {
+        failed += 1;
+        logger.error(`Re-engagement email failed for user ${candidate.id}:`, error);
+      }
+    }
+    logger.info(`Re-engagement sweep: ${sent} sent, ${failed} failed, ${candidates.length} candidates.`);
+    return { candidates: candidates.length, sent, failed };
   }
 }
 

@@ -196,9 +196,36 @@ async function sendWelcomeEmail({ to, username }) {
   });
 }
 
+function reEngagementTemplate(username, daysInactive, streakDays) {
+  const streakLine =
+    streakDays > 0
+      ? `Your <strong>${streakDays}-day streak</strong> is still alive — but only for a little longer.`
+      : `A fresh streak is one lesson away.`;
+  return shell(`
+    <h1 style="color:${brand.ink};font-family:Georgia,serif;font-size:24px;margin:0 0 16px;">We miss you, ${username} 👋</h1>
+    <p style="color:${brand.inkSoft};font-size:15px;line-height:1.7;margin:0 0 20px;">
+      It's been ${daysInactive} days since your last lesson. ${streakLine}
+    </p>
+    <p style="color:${brand.inkSoft};font-size:15px;line-height:1.7;margin:0 0 24px;">
+      Just 5 minutes today keeps your progress moving — no pressure, just pick up where you left off.
+    </p>
+    <a href="https://fvibeon.vercel.app" style="display:inline-block;background:${brand.ink};color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:999px;font-size:15px;font-weight:bold;">
+      Continue learning
+    </a>`);
+}
+
+async function sendReEngagementEmail({ to, username, daysInactive, streakDays }) {
+  return sendEmail({
+    to,
+    subject: streakDays > 0 ? `Your ${streakDays}-day streak needs you 🔥` : 'We miss you at Vibeon Learn',
+    html: reEngagementTemplate(username, daysInactive, streakDays),
+  });
+}
+
 module.exports = {
   sendEmail,
   sendVerificationEmail,
   sendPasswordResetEmail,
   sendWelcomeEmail,
+  sendReEngagementEmail,
 };

@@ -23,6 +23,10 @@ model User {
   proficiencyLevel   String?
   dailyGoalMinutes   Int?
   isPremium          Boolean              @default(false)
+  streakFreezes      Int                  @default(1)
+  streakFreezeDates  Json                 @default("[]")
+  streakFreezeMilestone Int               @default(0)
+  lastReEngagementEmailAt DateTime?
   emailVerified         Boolean           @default(false)
   verificationCode      String?
   verificationExpiresAt DateTime?

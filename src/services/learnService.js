@@ -64,7 +64,16 @@ class LearnService {
       // Each piece is independent: a blip in one (e.g. achievements) must
       // never take down the whole dashboard when the others succeeded.
       const emptyStats = {
-        overall: { totalLessons: 0, completedLessons: 0, completionRate: 0, totalTimeMinutes: 0, streakDays: 0 },
+        overall: {
+          totalLessons: 0,
+          completedLessons: 0,
+          completionRate: 0,
+          totalTimeMinutes: 0,
+          streakDays: 0,
+          streakFreezes: 0,
+          streakFreezeJustUsed: false,
+          streakFreezeJustGranted: false,
+        },
         courses: { enrolled: 0, completed: 0 },
         quizzes: { totalAttempts: 0 },
         weeklyActivity: [],
@@ -113,6 +122,9 @@ class LearnService {
           streakDays: stats.overall.streakDays,
           totalTimeMinutes: stats.overall.totalTimeMinutes,
           lessonsCompleted: stats.overall.completedLessons,
+          streakFreezes: stats.overall.streakFreezes,
+          streakFreezeJustUsed: stats.overall.streakFreezeJustUsed,
+          streakFreezeJustGranted: stats.overall.streakFreezeJustGranted,
         },
         recentCourses: enrollments.map(e => ({
           id: e.course.id,

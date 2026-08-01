@@ -6,6 +6,7 @@ const learnRoutes = require('./learnRoutes');
 const aiRoutes = require('./aiRoutes');
 const translationRoutes = require('./translationRoutes');
 const certificateRoutes = require('./certificateRoutes');
+const cronRoutes = require('./cronRoutes');
 
 const router = express.Router();
 router.use('/auth', authRoutes);
@@ -15,5 +16,6 @@ router.use('/learn', learnRoutes);
 router.use('/ai', aiRoutes);
 router.use('/translation', translationRoutes);
 router.use('/certificates', certificateRoutes);
+router.use('/cron', cronRoutes);
 
 module.exports = router;

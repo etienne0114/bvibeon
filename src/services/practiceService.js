@@ -309,7 +309,7 @@ async function markVocabularyResult(userId, vocabularyItemId, correct) {
 async function getVocabularyStats(userId) {
   const all = await prisma.vocabularyProgress.findMany({
     where: { userId },
-    select: { masteryLevel: true, correctCount: true, incorrectCount: true, streak: true, status: true },
+    select: { masteryLevel: true, correctCount: true, incorrectCount: true, streak: true, status: true, nextReviewAt: true },
   });
 
   const total = all.length;
@@ -320,7 +320,13 @@ async function getVocabularyStats(userId) {
   const accuracy = totalAnswers > 0 ? Math.round((totalCorrect / totalAnswers) * 100) : 0;
   const currentStreak = all.reduce((max, p) => Math.max(max, p.streak), 0);
 
-  return { totalWords: total, mastered, learning, accuracy, currentStreak };
+  // Same "due" definition as getSpacedRepetitionQueue's SM-2 query — this is
+  // the number of already-tracked words that would show up as review (not
+  // brand-new) if the learner opened the vocabulary queue right now.
+  const now = new Date();
+  const dueForReview = all.filter((p) => p.masteryLevel < 6 && (!p.nextReviewAt || p.nextReviewAt <= now)).length;
+
+  return { totalWords: total, mastered, learning, accuracy, currentStreak, dueForReview };
 }
 
 async function transcribeVoiceMessage(audioBuffer, language) {

@@ -50,6 +50,8 @@ model User {
   learningPaths      LearningPath[]
   pathEnrollments    PathEnrollment[]
   skillSessions      SkillSession[]
+  submittedSentences SentenceSubmission[] @relation("SubmittedSentences")
+  givenCorrections   SentenceCorrection[] @relation("GivenCorrections")
 }
 
 model Course {
@@ -450,4 +452,35 @@ model SkillSession {
 
   @@index([userId, skill, createdAt(sort: Desc)])
   @@index([passageId])
+}
+
+// Scoped peer-correction ("Sentence Swap"): a learner submits one sentence
+// a day, another learner ahead of them corrects it — deliberately not an
+// open italki-style public feed, which is a moderation burden a solo
+// founder can't sustain. See missingFeatures.md.
+model SentenceSubmission {
+  id         String              @id @default(uuid())
+  userId     String
+  language   String
+  text       String              @db.Text
+  status     String              @default("PENDING") // PENDING, CORRECTED
+  createdAt  DateTime            @default(now())
+  user       User                @relation("SubmittedSentences", fields: [userId], references: [id])
+  correction SentenceCorrection?
+
+  @@index([language, status, createdAt])
+  @@index([userId, createdAt])
+}
+
+model SentenceCorrection {
+  id            String             @id @default(uuid())
+  submissionId  String             @unique
+  correctorId   String
+  correctedText String             @db.Text
+  note          String?            @db.Text
+  createdAt     DateTime           @default(now())
+  submission    SentenceSubmission @relation(fields: [submissionId], references: [id])
+  corrector     User               @relation("GivenCorrections", fields: [correctorId], references: [id])
+
+  @@index([correctorId])
 }

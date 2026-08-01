@@ -8,6 +8,7 @@ const translationRoutes = require('./translationRoutes');
 const certificateRoutes = require('./certificateRoutes');
 const cronRoutes = require('./cronRoutes');
 const pathRoutes = require('./pathRoutes');
+const communityRoutes = require('./communityRoutes');
 
 const router = express.Router();
 router.use('/auth', authRoutes);
@@ -19,5 +20,6 @@ router.use('/translation', translationRoutes);
 router.use('/certificates', certificateRoutes);
 router.use('/cron', cronRoutes);
 router.use('/paths', pathRoutes);
+router.use('/community', communityRoutes);
 
 module.exports = router;

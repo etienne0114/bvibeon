@@ -1,5 +1,6 @@
 const express = require('express');
 const learnController = require('../controllers/learnController');
+const placementTestController = require('../controllers/placementTestController');
 const { auth } = require('../middleware/auth');
 const dictionaryRoutes = require('./dictionaryRoutes');
 const practiceRoutes = require('./practiceRoutes');
@@ -13,6 +14,8 @@ router.get('/analytics', auth, learnController.getAnalytics);
 router.get('/motivation', auth, learnController.getMotivation);
 router.get('/practices', auth, learnController.getPractices);
 router.post('/practices/sessions', auth, learnController.startPracticeSession);
+router.get('/placement-test', auth, placementTestController.getQuestions);
+router.post('/placement-test/submit', auth, placementTestController.submit);
 router.use('/dictionary', dictionaryRoutes);
 router.use('/practice', auth, practiceRoutes);
 router.use('/', auth, readingListeningRoutes);

@@ -52,6 +52,7 @@ model User {
   skillSessions      SkillSession[]
   submittedSentences SentenceSubmission[] @relation("SubmittedSentences")
   givenCorrections   SentenceCorrection[] @relation("GivenCorrections")
+  audioContributions AudioContribution[]  @relation("AudioContributions")
 }
 
 model Course {
@@ -222,6 +223,7 @@ model VocabularyItem {
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
   userProgress  VocabularyProgress[]
+  audioContributions AudioContribution[]
 
   @@index([language, difficulty])
 }
@@ -470,6 +472,31 @@ model SentenceSubmission {
 
   @@index([language, status, createdAt])
   @@index([userId, createdAt])
+}
+
+// Community-recorded pronunciation audio — a real alternative to TTS for
+// core vocabulary, built up organically by learners recording themselves
+// rather than sourced/licensed native-speaker audio (which nobody involved
+// in building this app can actually produce). Deliberately NOT labeled
+// "native speaker" anywhere — that's a claim this app has no way to verify.
+// No object storage is wired up yet, so short clips are stored as base64
+// directly (size-capped) — a real trade-off for a solo founder's MVP, not
+// a shortcut meant to last forever.
+model AudioContribution {
+  id            String          @id @default(uuid())
+  contributorId String
+  word          String
+  language      String
+  vocabularyItemId String?
+  audioData     String          @db.Text // base64-encoded clip, size-capped at submit time
+  mimeType      String          @default("audio/webm")
+  reportCount   Int             @default(0)
+  createdAt     DateTime        @default(now())
+  contributor   User            @relation("AudioContributions", fields: [contributorId], references: [id])
+  vocabularyItem VocabularyItem? @relation(fields: [vocabularyItemId], references: [id])
+
+  @@index([word, language, reportCount])
+  @@index([contributorId, createdAt])
 }
 
 model SentenceCorrection {

@@ -4,6 +4,7 @@ const logger = require('../utils/logger');
 
 const MAX_MEDIA_BYTES = 400 * 1024; // ~400KB — voice notes / images, base64-in-Postgres (no object storage wired up yet)
 const INVITE_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no ambiguous 0/O/1/I
+const RANK = { OWNER: 3, MODERATOR: 2, MEMBER: 1 };
 
 function generateInviteCode() {
   let code = '';
@@ -109,6 +110,100 @@ class SpaceService {
     return { spaceId: invite.spaceId, membership };
   }
 
+  async updateSpace(userId, spaceId, { name, description, visibility }) {
+    await this._requireModerator(userId, spaceId);
+    const data = {};
+    if (name !== undefined) {
+      const cleanName = (name || '').trim();
+      if (!cleanName) throw new Error('Give your space a name.');
+      if (cleanName.length > 80) throw new Error('Keep the name under 80 characters.');
+      data.name = cleanName;
+    }
+    if (description !== undefined) data.description = (description || '').trim() || null;
+    if (visibility !== undefined) data.visibility = visibility === 'PRIVATE' ? 'PRIVATE' : 'PUBLIC';
+    return prisma.space.update({ where: { id: spaceId }, data });
+  }
+
+  /** Owner-only, and cascades manually since FKs are RESTRICT (no ON DELETE CASCADE). */
+  async deleteSpace(userId, spaceId) {
+    const space = await prisma.space.findUnique({ where: { id: spaceId } });
+    if (!space) throw new Error('Space not found.');
+    if (space.ownerId !== userId) throw new Error('Only the space owner can delete it.');
+
+    const channels = await prisma.channel.findMany({ where: { spaceId }, select: { id: true } });
+    const channelIds = channels.map((c) => c.id);
+    await prisma.$transaction([
+      prisma.debateRequest.deleteMany({ where: { channelId: { in: channelIds } } }),
+      prisma.channelMessage.deleteMany({ where: { channelId: { in: channelIds } } }),
+      prisma.channel.deleteMany({ where: { spaceId } }),
+      prisma.spaceInvite.deleteMany({ where: { spaceId } }),
+      prisma.spaceMembership.deleteMany({ where: { spaceId } }),
+      prisma.space.delete({ where: { id: spaceId } }),
+    ]);
+  }
+
+  async listMembers(userId, spaceId) {
+    await this._requireMemberOfSpace(userId, spaceId);
+    return prisma.spaceMembership.findMany({
+      where: { spaceId },
+      orderBy: [{ role: 'asc' }, { joinedAt: 'asc' }],
+      include: { user: { select: { id: true, username: true } } },
+    });
+  }
+
+  /** Owner-only: set a member's role to MODERATOR or MEMBER (not OWNER — see transferOwnership). */
+  async updateMemberRole(userId, spaceId, targetUserId, newRole) {
+    const space = await prisma.space.findUnique({ where: { id: spaceId } });
+    if (!space) throw new Error('Space not found.');
+    if (space.ownerId !== userId) throw new Error('Only the space owner can change roles.');
+    if (targetUserId === userId) throw new Error("You can't change your own role.");
+    if (newRole !== 'MODERATOR' && newRole !== 'MEMBER') throw new Error('Invalid role.');
+
+    const target = await prisma.spaceMembership.findUnique({ where: { spaceId_userId: { spaceId, userId: targetUserId } } });
+    if (!target) throw new Error('That person is not a member of this space.');
+    return prisma.spaceMembership.update({ where: { id: target.id }, data: { role: newRole } });
+  }
+
+  /** Rank-checked: a moderator can remove a member, never a peer moderator or the owner. */
+  async removeMember(userId, spaceId, targetUserId) {
+    if (targetUserId === userId) throw new Error('Use "Leave space" to remove yourself.');
+    const actor = await this._requireModerator(userId, spaceId);
+    const target = await prisma.spaceMembership.findUnique({ where: { spaceId_userId: { spaceId, userId: targetUserId } } });
+    if (!target) throw new Error('That person is not a member of this space.');
+    if (RANK[target.role] >= RANK[actor.role]) {
+      throw new Error('You can only remove members ranked below you.');
+    }
+    await prisma.spaceMembership.delete({ where: { id: target.id } });
+  }
+
+  async leaveSpace(userId, spaceId) {
+    const membership = await prisma.spaceMembership.findUnique({ where: { spaceId_userId: { spaceId, userId } } });
+    if (!membership) throw new Error("You're not a member of this space.");
+    if (membership.role === 'OWNER') {
+      throw new Error('Transfer ownership or delete the space before leaving — an owner can\'t just leave.');
+    }
+    await prisma.spaceMembership.delete({ where: { id: membership.id } });
+  }
+
+  /** Owner-only: hand the space to an existing member; the old owner becomes a moderator. */
+  async transferOwnership(userId, spaceId, targetUserId) {
+    const space = await prisma.space.findUnique({ where: { id: spaceId } });
+    if (!space) throw new Error('Space not found.');
+    if (space.ownerId !== userId) throw new Error('Only the space owner can transfer ownership.');
+    if (targetUserId === userId) throw new Error('You already own this space.');
+    const target = await prisma.spaceMembership.findUnique({ where: { spaceId_userId: { spaceId, userId: targetUserId } } });
+    if (!target) throw new Error('That person is not a member of this space.');
+
+    await prisma.$transaction([
+      prisma.space.update({ where: { id: spaceId }, data: { ownerId: targetUserId } }),
+      prisma.spaceMembership.update({ where: { id: target.id }, data: { role: 'OWNER' } }),
+      prisma.spaceMembership.update({
+        where: { spaceId_userId: { spaceId, userId } },
+        data: { role: 'MODERATOR' },
+      }),
+    ]);
+  }
+
   async createChannel(userId, spaceId, { name, description, type }) {
     await this._requireModerator(userId, spaceId);
     const cleanName = (name || '').trim();
@@ -123,6 +218,35 @@ class SpaceService {
         order: count + 1,
       },
     });
+  }
+
+  async updateChannel(userId, channelId, { name, description }) {
+    const channel = await prisma.channel.findUnique({ where: { id: channelId } });
+    if (!channel) throw new Error('Channel not found.');
+    await this._requireModerator(userId, channel.spaceId);
+    const data = {};
+    if (name !== undefined) {
+      const cleanName = (name || '').trim();
+      if (!cleanName) throw new Error('Give the channel a name.');
+      data.name = cleanName;
+    }
+    if (description !== undefined) data.description = (description || '').trim() || null;
+    return prisma.channel.update({ where: { id: channelId }, data });
+  }
+
+  /** Keeps at least one channel per space so a space is never left unusable. */
+  async deleteChannel(userId, channelId) {
+    const channel = await prisma.channel.findUnique({ where: { id: channelId } });
+    if (!channel) throw new Error('Channel not found.');
+    await this._requireModerator(userId, channel.spaceId);
+    const channelCount = await prisma.channel.count({ where: { spaceId: channel.spaceId } });
+    if (channelCount <= 1) throw new Error('A space needs at least one channel.');
+
+    await prisma.$transaction([
+      prisma.debateRequest.deleteMany({ where: { channelId } }),
+      prisma.channelMessage.deleteMany({ where: { channelId } }),
+      prisma.channel.delete({ where: { id: channelId } }),
+    ]);
   }
 
   async listMessages(userId, channelId, limit = 50) {
@@ -183,6 +307,30 @@ class SpaceService {
     return prisma.channelMessage.findUnique({ where: { id: messageId } });
   }
 
+  /** Own message always deletable; otherwise the actor must outrank the author (owner deletes anyone's, moderator deletes members' only). */
+  async deleteMessage(userId, messageId) {
+    const message = await prisma.channelMessage.findUnique({
+      where: { id: messageId },
+      include: { channel: true },
+    });
+    if (!message) throw new Error('Message not found.');
+    if (message.userId === userId) {
+      await prisma.channelMessage.delete({ where: { id: messageId } });
+      return;
+    }
+    const [actor, author] = await Promise.all([
+      prisma.spaceMembership.findUnique({ where: { spaceId_userId: { spaceId: message.channel.spaceId, userId } } }),
+      prisma.spaceMembership.findUnique({ where: { spaceId_userId: { spaceId: message.channel.spaceId, userId: message.userId } } }),
+    ]);
+    if (!actor || (actor.role !== 'OWNER' && actor.role !== 'MODERATOR')) {
+      throw new Error('Only the space owner or a moderator can remove someone else\'s message.');
+    }
+    if (author && RANK[author.role] >= RANK[actor.role]) {
+      throw new Error('You can only remove messages from members ranked below you.');
+    }
+    await prisma.channelMessage.delete({ where: { id: messageId } });
+  }
+
   async requestToJoinDebate(userId, channelId) {
     const channel = await prisma.channel.findUnique({ where: { id: channelId } });
     if (!channel || channel.type !== 'DEBATE') throw new Error('This is not a debate channel.');
@@ -236,6 +384,12 @@ class SpaceService {
     if (!membership || (membership.role !== 'OWNER' && membership.role !== 'MODERATOR')) {
       throw new Error('Only the space owner or a moderator can do that.');
     }
+    return membership;
+  }
+
+  async _requireMemberOfSpace(userId, spaceId) {
+    const membership = await prisma.spaceMembership.findUnique({ where: { spaceId_userId: { spaceId, userId } } });
+    if (!membership) throw new Error('Join this space first.');
     return membership;
   }
 }

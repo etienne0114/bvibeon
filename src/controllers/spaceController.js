@@ -62,6 +62,97 @@ async function joinViaInvite(req, res) {
   }
 }
 
+async function updateSpace(req, res) {
+  try {
+    const space = await spaceService.updateSpace(req.user.id, req.params.spaceId, req.body);
+    res.json({ success: true, data: space });
+  } catch (error) {
+    handle(res, error, 'Update space error');
+  }
+}
+
+async function deleteSpace(req, res) {
+  try {
+    await spaceService.deleteSpace(req.user.id, req.params.spaceId);
+    res.json({ success: true });
+  } catch (error) {
+    handle(res, error, 'Delete space error');
+  }
+}
+
+async function listMembers(req, res) {
+  try {
+    const members = await spaceService.listMembers(req.user.id, req.params.spaceId);
+    res.json({ success: true, data: members });
+  } catch (error) {
+    handle(res, error, 'List members error');
+  }
+}
+
+async function updateMemberRole(req, res) {
+  try {
+    const { role } = req.body;
+    const membership = await spaceService.updateMemberRole(req.user.id, req.params.spaceId, req.params.userId, role);
+    res.json({ success: true, data: membership });
+  } catch (error) {
+    handle(res, error, 'Update member role error');
+  }
+}
+
+async function removeMember(req, res) {
+  try {
+    await spaceService.removeMember(req.user.id, req.params.spaceId, req.params.userId);
+    res.json({ success: true });
+  } catch (error) {
+    handle(res, error, 'Remove member error');
+  }
+}
+
+async function leaveSpace(req, res) {
+  try {
+    await spaceService.leaveSpace(req.user.id, req.params.spaceId);
+    res.json({ success: true });
+  } catch (error) {
+    handle(res, error, 'Leave space error');
+  }
+}
+
+async function transferOwnership(req, res) {
+  try {
+    await spaceService.transferOwnership(req.user.id, req.params.spaceId, req.params.userId);
+    res.json({ success: true });
+  } catch (error) {
+    handle(res, error, 'Transfer ownership error');
+  }
+}
+
+async function updateChannel(req, res) {
+  try {
+    const channel = await spaceService.updateChannel(req.user.id, req.params.channelId, req.body);
+    res.json({ success: true, data: channel });
+  } catch (error) {
+    handle(res, error, 'Update channel error');
+  }
+}
+
+async function deleteChannel(req, res) {
+  try {
+    await spaceService.deleteChannel(req.user.id, req.params.channelId);
+    res.json({ success: true });
+  } catch (error) {
+    handle(res, error, 'Delete channel error');
+  }
+}
+
+async function deleteMessage(req, res) {
+  try {
+    await spaceService.deleteMessage(req.user.id, req.params.messageId);
+    res.json({ success: true });
+  } catch (error) {
+    handle(res, error, 'Delete message error');
+  }
+}
+
 async function createChannel(req, res) {
   try {
     const channel = await spaceService.createChannel(req.user.id, req.params.spaceId, req.body);
@@ -151,10 +242,20 @@ module.exports = {
   joinSpace,
   createInvite,
   joinViaInvite,
+  updateSpace,
+  deleteSpace,
+  listMembers,
+  updateMemberRole,
+  removeMember,
+  leaveSpace,
+  transferOwnership,
   createChannel,
+  updateChannel,
+  deleteChannel,
   listMessages,
   postMessage,
   getMessageMedia,
+  deleteMessage,
   requestToJoinDebate,
   listDebateRequests,
   resolveDebateRequest,

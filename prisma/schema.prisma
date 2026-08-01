@@ -53,6 +53,10 @@ model User {
   submittedSentences SentenceSubmission[] @relation("SubmittedSentences")
   givenCorrections   SentenceCorrection[] @relation("GivenCorrections")
   audioContributions AudioContribution[]  @relation("AudioContributions")
+  ownedSpaces        Space[]              @relation("OwnedSpaces")
+  spaceMemberships   SpaceMembership[]    @relation("SpaceMemberships")
+  channelMessages    ChannelMessage[]     @relation("ChannelMessages")
+  debateRequests     DebateRequest[]      @relation("DebateRequests")
 }
 
 model Course {
@@ -510,4 +514,95 @@ model SentenceCorrection {
   corrector     User               @relation("GivenCorrections", fields: [correctorId], references: [id])
 
   @@index([correctorId])
+}
+
+// Spaces & Channels — built natively in Vibeon Learn (not an embedded
+// third-party product). A Space is a community (public, listed in a
+// directory and freely joinable — or private, joinable only via invite
+// link). Each Space has Channels; a DEBATE channel is a moderated
+// discussion where anyone can request to join as a participant, approved
+// by the space's owner/moderators — async only for now (text/voice/image
+// messages), live audio/video deferred to a later phase pending a WebRTC
+// provider decision.
+model Space {
+  id          String            @id @default(uuid())
+  name        String
+  description String?           @db.Text
+  visibility  String            @default("PUBLIC") // PUBLIC, PRIVATE
+  ownerId     String
+  createdAt   DateTime          @default(now())
+  owner       User              @relation("OwnedSpaces", fields: [ownerId], references: [id])
+  memberships SpaceMembership[]
+  invites     SpaceInvite[]
+  channels    Channel[]
+
+  @@index([visibility, createdAt])
+}
+
+model SpaceMembership {
+  id       String   @id @default(uuid())
+  spaceId  String
+  userId   String
+  role     String   @default("MEMBER") // OWNER, MODERATOR, MEMBER
+  joinedAt DateTime @default(now())
+  space    Space    @relation(fields: [spaceId], references: [id])
+  user     User     @relation("SpaceMemberships", fields: [userId], references: [id])
+
+  @@unique([spaceId, userId])
+  @@index([userId])
+}
+
+model SpaceInvite {
+  id        String   @id @default(uuid())
+  spaceId   String
+  code      String   @unique
+  createdBy String
+  useCount  Int      @default(0)
+  createdAt DateTime @default(now())
+  space     Space    @relation(fields: [spaceId], references: [id])
+
+  @@index([spaceId])
+}
+
+model Channel {
+  id             String           @id @default(uuid())
+  spaceId        String
+  name           String
+  description    String?
+  type           String           @default("TEXT") // TEXT, DEBATE
+  order          Int              @default(1)
+  createdAt      DateTime         @default(now())
+  space          Space            @relation(fields: [spaceId], references: [id])
+  messages       ChannelMessage[]
+  debateRequests DebateRequest[]
+
+  @@index([spaceId])
+}
+
+model ChannelMessage {
+  id        String   @id @default(uuid())
+  channelId String
+  userId    String
+  type      String   @default("TEXT") // TEXT, VOICE, IMAGE
+  text      String?  @db.Text
+  mediaData String?  @db.Text // base64, size-capped at submit time
+  mimeType  String?
+  createdAt DateTime @default(now())
+  channel   Channel  @relation(fields: [channelId], references: [id])
+  user      User     @relation("ChannelMessages", fields: [userId], references: [id])
+
+  @@index([channelId, createdAt])
+}
+
+model DebateRequest {
+  id        String   @id @default(uuid())
+  channelId String
+  userId    String
+  status    String   @default("PENDING") // PENDING, APPROVED, DECLINED
+  createdAt DateTime @default(now())
+  channel   Channel  @relation(fields: [channelId], references: [id])
+  user      User     @relation("DebateRequests", fields: [userId], references: [id])
+
+  @@unique([channelId, userId])
+  @@index([channelId, status])
 }

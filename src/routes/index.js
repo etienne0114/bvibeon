@@ -9,6 +9,7 @@ const certificateRoutes = require('./certificateRoutes');
 const cronRoutes = require('./cronRoutes');
 const pathRoutes = require('./pathRoutes');
 const communityRoutes = require('./communityRoutes');
+const spaceRoutes = require('./spaceRoutes');
 
 const router = express.Router();
 router.use('/auth', authRoutes);
@@ -21,5 +22,6 @@ router.use('/certificates', certificateRoutes);
 router.use('/cron', cronRoutes);
 router.use('/paths', pathRoutes);
 router.use('/community', communityRoutes);
+router.use('/spaces', spaceRoutes);
 
 module.exports = router;

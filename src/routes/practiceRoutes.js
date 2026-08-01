@@ -36,6 +36,10 @@ router.post('/technology/start', practiceController.startTechnologySession);
 router.post('/technology/message', practiceController.sendTechnologyMessage);
 router.post('/technology/complete', practiceController.completeTechnologySession);
 
+// Pronunciation assessment
+router.post('/pronunciation/assess', practiceController.assessPronunciation);
+router.get('/pronunciation/stats', practiceController.getPronunciationStats);
+
 // Achievements
 router.get('/achievements', practiceController.getAchievements);
 

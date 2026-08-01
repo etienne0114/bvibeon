@@ -1,4 +1,5 @@
 const practiceService = require('../services/practiceService');
+const pronunciationAssessmentService = require('../services/pronunciationAssessmentService');
 const { sendServerError } = require('../utils/errors');
 
 // Our own `throw new Error('Scenario not found')`-style messages (and the
@@ -255,6 +256,33 @@ async function getAchievements(req, res) {
   }
 }
 
+async function assessPronunciation(req, res) {
+  try {
+    const { expectedText, language, audio } = req.body;
+    if (!expectedText || !audio) {
+      return res.status(400).json({ success: false, error: 'expectedText and audio are required' });
+    }
+    const audioBuffer = Buffer.from(audio, 'base64');
+    const result = await pronunciationAssessmentService.assessPronunciation(req.user.id, expectedText, language || 'en', audioBuffer);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    if (isAppError(error)) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+    sendServerError(res, error, 'Assess pronunciation error');
+  }
+}
+
+async function getPronunciationStats(req, res) {
+  try {
+    const language = req.query.language || null;
+    const stats = await pronunciationAssessmentService.getUserStats(req.user.id, language);
+    res.json({ success: true, data: stats });
+  } catch (error) {
+    sendServerError(res, error, 'Get pronunciation stats error');
+  }
+}
+
 module.exports = {
   getDailyVocabulary,
   getVocabularyQueue,
@@ -272,4 +300,6 @@ module.exports = {
   sendTechnologyMessage,
   completeTechnologySession,
   getAchievements,
+  assessPronunciation,
+  getPronunciationStats,
 };

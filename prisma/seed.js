@@ -1145,6 +1145,40 @@ const DICTIONARY_SEED = [
   { word: 'à gauche', language: 'fr', definition: 'To the left', pronunciation: 'ah gohsh', partOfSpeech: 'adverb', examples: ["Tournez à gauche."], synonyms: [] },
 ];
 
+// Curated multi-course sequences on top of the courses above — the
+// LearningPath/PathStep/PathEnrollment backend already existed fully built
+// (learningPathService.js) but had no real published paths and no route
+// ever called it. Steps reference courses by title; resolved to real
+// courseIds during seeding once every course above has been upserted.
+const LEARNING_PATHS = [
+  {
+    title: 'English Grammar Mastery',
+    description: 'The complete route through English tenses: everyday phrases first, then present, past, and future — in the order that makes each one click.',
+    difficulty: 'BEGINNER',
+    status: 'PUBLISHED',
+    tags: ['english', 'grammar', 'tenses'],
+    estimatedDuration: 1360,
+    steps: [
+      { courseTitle: 'Everyday English', title: 'Start with everyday English', description: 'Real conversational phrases and the present-simple basics you\'ll lean on in every tense that follows.' },
+      { courseTitle: 'English Grammar: Present Tenses', title: 'Master the present', description: 'All four present tenses, beginner to advanced.' },
+      { courseTitle: 'English Grammar: Past Tenses', title: 'Master the past', description: 'All four past tenses, beginner to advanced.' },
+      { courseTitle: 'English Grammar: Future Tenses', title: 'Master the future', description: 'All four future tenses, beginner to advanced — completes the full tense trilogy.' },
+    ],
+  },
+  {
+    title: 'Kinyarwanda & English Starter',
+    description: 'A two-language starting point for absolute beginners: everyday Kinyarwanda alongside everyday English.',
+    difficulty: 'BEGINNER',
+    status: 'PUBLISHED',
+    tags: ['kinyarwanda', 'english', 'beginner'],
+    estimatedDuration: 314,
+    steps: [
+      { courseTitle: 'Kinyarwanda for Beginners', title: 'Everyday Kinyarwanda', description: 'Greetings, numbers, family, market talk, food, and directions.' },
+      { courseTitle: 'Everyday English', title: 'Everyday English', description: 'Introductions, routines, past stories, directions, work, and future plans.' },
+    ],
+  },
+];
+
 async function main() {
   console.log('🌱 Seeding Vibeon Learn starter content...');
 
@@ -1238,6 +1272,38 @@ async function main() {
     }
 
     console.log(`📚 Course ready: ${course.title} (${lessonRecords.length} lessons)`);
+  }
+
+  for (const pathData of LEARNING_PATHS) {
+    const { steps, tags, ...pathFields } = pathData;
+    const existingPath = await prisma.learningPath.findFirst({ where: { title: pathFields.title } });
+    const path = existingPath
+      ? await prisma.learningPath.update({ where: { id: existingPath.id }, data: { ...pathFields, tags: JSON.stringify(tags), creatorId: admin.id } })
+      : await prisma.learningPath.create({ data: { ...pathFields, tags: JSON.stringify(tags), creatorId: admin.id } });
+
+    // Steps carry no learner progress of their own (that lives on
+    // PathEnrollment + the underlying CourseEnrollments) — safe to fully
+    // replace on every reseed rather than title-matching like lessons.
+    await prisma.pathStep.deleteMany({ where: { pathId: path.id } });
+    for (let i = 0; i < steps.length; i += 1) {
+      const step = steps[i];
+      const course = await prisma.course.findFirst({ where: { title: step.courseTitle } });
+      if (!course) {
+        console.log(`  ⚠️  Skipped path step "${step.title}" — course "${step.courseTitle}" not found`);
+        continue;
+      }
+      await prisma.pathStep.create({
+        data: {
+          pathId: path.id,
+          courseId: course.id,
+          title: step.title,
+          description: step.description,
+          order: i + 1,
+          isRequired: true,
+        },
+      });
+    }
+    console.log(`🧭 Learning path ready: ${path.title} (${steps.length} steps)`);
   }
 
   for (const d of DICTIONARY_SEED) {

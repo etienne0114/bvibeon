@@ -70,13 +70,12 @@ class LearningPathService {
    */
   async enrollUser(userId, pathId) {
     try {
-      return await prisma.pathEnrollment.create({
-        data: {
-          userId,
-          pathId,
-          progress: 0,
-          status: 'ACTIVE',
-        },
+      const path = await prisma.learningPath.findUnique({ where: { id: pathId }, select: { id: true } });
+      if (!path) throw new Error('Learning path not found');
+      return await prisma.pathEnrollment.upsert({
+        where: { userId_pathId: { userId, pathId } },
+        update: {},
+        create: { userId, pathId, progress: 0, status: 'ACTIVE' },
       });
     } catch (error) {
       logger.error('Enroll in path error:', error);
@@ -122,6 +121,71 @@ class LearningPathService {
       logger.error('List paths error:', error);
       throw error;
     }
+  }
+
+  /**
+   * Published paths plus, for a signed-in learner, whether they're
+   * enrolled and their current progress — so the catalog screen never
+   * needs a second round trip per card.
+   */
+  async listPathsForUser(userId, filters = {}) {
+    const paths = await this.listPaths(filters);
+    if (!userId || paths.length === 0) return paths.map((p) => ({ ...p, enrollment: null }));
+
+    const enrollments = await prisma.pathEnrollment.findMany({
+      where: { userId, pathId: { in: paths.map((p) => p.id) } },
+    });
+    const byPathId = new Map(enrollments.map((e) => [e.pathId, e]));
+    return paths.map((p) => ({ ...p, enrollment: byPathId.get(p.id) || null }));
+  }
+
+  /**
+   * Path detail with each step annotated by the learner's real progress in
+   * that step's course — steps carry no progress of their own, so this
+   * reads the same CourseEnrollment data the Courses tab already shows,
+   * keeping the two views from ever disagreeing.
+   */
+  async getPathWithProgress(userId, pathId) {
+    const path = await this.getPath(pathId);
+    if (!path) return null;
+
+    const courseIds = path.steps.map((s) => s.courseId).filter(Boolean);
+    const [enrollment, courseEnrollments] = await Promise.all([
+      userId ? prisma.pathEnrollment.findUnique({ where: { userId_pathId: { userId, pathId } } }) : null,
+      userId && courseIds.length
+        ? prisma.courseEnrollment.findMany({ where: { userId, courseId: { in: courseIds } } })
+        : [],
+    ]);
+    const progressByCourseId = new Map(courseEnrollments.map((e) => [e.courseId, e]));
+
+    const steps = path.steps.map((step) => {
+      const courseProgress = step.courseId ? progressByCourseId.get(step.courseId) : null;
+      return {
+        ...step,
+        courseEnrolled: Boolean(courseProgress),
+        courseProgress: courseProgress?.progress ?? 0,
+        courseCompleted: courseProgress?.isCompleted ?? false,
+      };
+    });
+
+    // Auto-heal the enrollment's overall progress from the steps' real
+    // course progress, the same "recompute on read" pattern used for
+    // course/streak progress elsewhere — no separate cron needed.
+    if (enrollment && steps.length > 0) {
+      const requiredSteps = steps.filter((s) => s.isRequired);
+      const denom = requiredSteps.length || steps.length;
+      const completedCount = (requiredSteps.length ? requiredSteps : steps).filter((s) => s.courseCompleted).length;
+      const computedProgress = Math.round((completedCount / denom) * 100);
+      if (computedProgress !== enrollment.progress) {
+        await this.updateProgress(userId, pathId, computedProgress).catch((err) =>
+          logger.error('Auto-update path progress error:', err),
+        );
+        enrollment.progress = computedProgress;
+        enrollment.status = computedProgress >= 100 ? 'COMPLETED' : 'ACTIVE';
+      }
+    }
+
+    return { ...path, steps, enrollment };
   }
 }
 

@@ -57,6 +57,8 @@ model User {
   spaceMemberships   SpaceMembership[]    @relation("SpaceMemberships")
   channelMessages    ChannelMessage[]     @relation("ChannelMessages")
   debateRequests     DebateRequest[]      @relation("DebateRequests")
+  startedCalls       CallSession[]        @relation("StartedCalls")
+  callParticipations CallParticipant[]    @relation("CallParticipations")
 }
 
 model Course {
@@ -575,6 +577,7 @@ model Channel {
   space          Space            @relation(fields: [spaceId], references: [id])
   messages       ChannelMessage[]
   debateRequests DebateRequest[]
+  callSessions   CallSession[]
 
   @@index([spaceId])
 }
@@ -609,4 +612,53 @@ model DebateRequest {
 
   @@unique([channelId, userId])
   @@index([channelId, status])
+}
+
+// Voice/video calls — built entirely from scratch on free, open
+// infrastructure: native browser WebRTC (RTCPeerConnection) in a mesh
+// topology, Google's public STUN servers for NAT traversal (no account,
+// no cost), and our own Postgres-backed signaling relay below instead of
+// a WebSocket/Socket.io server — Vercel's serverless functions can't host
+// a persistent socket server, so peers exchange SDP offers/answers and
+// ICE candidates by polling this table. No TURN relay (would need a
+// self-hosted VPS running coturn); most direct connections still succeed
+// without one — that's the one real trade-off of staying zero-cost.
+model CallSession {
+  id           String            @id @default(uuid())
+  channelId    String
+  startedBy    String
+  startedAt    DateTime          @default(now())
+  endedAt      DateTime?
+  channel      Channel           @relation(fields: [channelId], references: [id])
+  starter      User              @relation("StartedCalls", fields: [startedBy], references: [id])
+  participants CallParticipant[]
+  signals      CallSignal[]
+
+  @@index([channelId, endedAt])
+}
+
+model CallParticipant {
+  id            String      @id @default(uuid())
+  callSessionId String
+  userId        String
+  joinedAt      DateTime    @default(now())
+  leftAt        DateTime?
+  callSession   CallSession @relation(fields: [callSessionId], references: [id])
+  user          User        @relation("CallParticipations", fields: [userId], references: [id])
+
+  @@unique([callSessionId, userId])
+  @@index([callSessionId, leftAt])
+}
+
+model CallSignal {
+  id            String      @id @default(uuid())
+  callSessionId String
+  fromUserId    String
+  toUserId      String? // null = broadcast (JOIN/LEAVE announcements)
+  type          String // OFFER, ANSWER, ICE_CANDIDATE, JOIN, LEAVE
+  payload       String      @db.Text // JSON-encoded SDP or ICE candidate
+  createdAt     DateTime    @default(now())
+  callSession   CallSession @relation(fields: [callSessionId], references: [id])
+
+  @@index([callSessionId, toUserId, createdAt])
 }

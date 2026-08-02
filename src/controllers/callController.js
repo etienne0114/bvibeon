@@ -18,7 +18,8 @@ async function getActiveCall(req, res) {
 
 async function joinCall(req, res) {
   try {
-    const result = await callService.joinCall(req.user.id, req.params.channelId);
+    const { speakingMode, speakerTimeSec } = req.body || {};
+    const result = await callService.joinCall(req.user.id, req.params.channelId, { speakingMode, speakerTimeSec });
     res.status(201).json({ success: true, data: result });
   } catch (error) {
     handle(res, error, 'Join call error');
@@ -53,4 +54,40 @@ async function pollSignals(req, res) {
   }
 }
 
-module.exports = { getActiveCall, joinCall, leaveCall, sendSignal, pollSignals };
+async function getCallState(req, res) {
+  try {
+    const state = await callService.getCallState(req.user.id, req.params.callSessionId);
+    res.json({ success: true, data: state });
+  } catch (error) {
+    handle(res, error, 'Get call state error');
+  }
+}
+
+async function raiseHand(req, res) {
+  try {
+    const state = await callService.raiseHand(req.user.id, req.params.callSessionId);
+    res.json({ success: true, data: state });
+  } catch (error) {
+    handle(res, error, 'Raise hand error');
+  }
+}
+
+async function lowerHand(req, res) {
+  try {
+    const state = await callService.lowerHand(req.user.id, req.params.callSessionId);
+    res.json({ success: true, data: state });
+  } catch (error) {
+    handle(res, error, 'Lower hand error');
+  }
+}
+
+async function advanceSpeaker(req, res) {
+  try {
+    const state = await callService.advanceSpeaker(req.user.id, req.params.callSessionId);
+    res.json({ success: true, data: state });
+  } catch (error) {
+    handle(res, error, 'Advance speaker error');
+  }
+}
+
+module.exports = { getActiveCall, joinCall, leaveCall, sendSignal, pollSignals, getCallState, raiseHand, lowerHand, advanceSpeaker };

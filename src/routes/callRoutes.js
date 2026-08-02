@@ -8,4 +8,8 @@ router.post('/channel/:channelId/join', auth, callController.joinCall);
 router.post('/:callSessionId/leave', auth, callController.leaveCall);
 router.post('/:callSessionId/signal', auth, callController.sendSignal);
 router.get('/:callSessionId/signals', auth, callController.pollSignals);
+router.get('/:callSessionId/state', auth, callController.getCallState);
+router.post('/:callSessionId/raise-hand', auth, callController.raiseHand);
+router.post('/:callSessionId/lower-hand', auth, callController.lowerHand);
+router.post('/:callSessionId/advance-speaker', auth, callController.advanceSpeaker);
 module.exports = router;

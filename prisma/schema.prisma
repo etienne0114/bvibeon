@@ -624,15 +624,20 @@ model DebateRequest {
 // self-hosted VPS running coturn); most direct connections still succeed
 // without one — that's the one real trade-off of staying zero-cost.
 model CallSession {
-  id           String            @id @default(uuid())
-  channelId    String
-  startedBy    String
-  startedAt    DateTime          @default(now())
-  endedAt      DateTime?
-  channel      Channel           @relation(fields: [channelId], references: [id])
-  starter      User              @relation("StartedCalls", fields: [startedBy], references: [id])
-  participants CallParticipant[]
-  signals      CallSignal[]
+  id                      String            @id @default(uuid())
+  channelId               String
+  startedBy               String
+  startedAt               DateTime          @default(now())
+  endedAt                 DateTime?
+  speakingMode            String            @default("OPEN") // OPEN | STRUCTURED
+  speakerTimeSec          Int?
+  currentSpeakerId        String?
+  currentSpeakerStartedAt DateTime?
+  speakerQueue            String            @default("[]") @db.Text // JSON array of userIds, raise-order
+  channel                 Channel           @relation(fields: [channelId], references: [id])
+  starter                 User              @relation("StartedCalls", fields: [startedBy], references: [id])
+  participants            CallParticipant[]
+  signals                 CallSignal[]
 
   @@index([channelId, endedAt])
 }

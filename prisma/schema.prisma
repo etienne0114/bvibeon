@@ -580,18 +580,22 @@ model Channel {
 }
 
 model ChannelMessage {
-  id        String   @id @default(uuid())
-  channelId String
-  userId    String
-  type      String   @default("TEXT") // TEXT, VOICE, IMAGE
-  text      String?  @db.Text
-  mediaData String?  @db.Text // base64, size-capped at submit time
-  mimeType  String?
-  createdAt DateTime @default(now())
-  channel   Channel  @relation(fields: [channelId], references: [id])
-  user      User     @relation("ChannelMessages", fields: [userId], references: [id])
+  id               String           @id @default(uuid())
+  channelId        String
+  userId           String
+  type             String           @default("TEXT") // TEXT, VOICE, IMAGE
+  text             String?          @db.Text
+  mediaData        String?          @db.Text // base64, size-capped at submit time
+  mimeType         String?
+  parentMessageId  String?
+  createdAt        DateTime         @default(now())
+  channel          Channel          @relation(fields: [channelId], references: [id])
+  user             User             @relation("ChannelMessages", fields: [userId], references: [id])
+  parent           ChannelMessage?  @relation("MessageReplies", fields: [parentMessageId], references: [id], onDelete: Cascade)
+  replies          ChannelMessage[] @relation("MessageReplies")
 
   @@index([channelId, createdAt])
+  @@index([parentMessageId])
 }
 
 model DebateRequest {

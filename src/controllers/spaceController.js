@@ -173,16 +173,26 @@ async function listMessages(req, res) {
 
 async function postMessage(req, res) {
   try {
-    const { type, text, media, mimeType } = req.body;
+    const { type, text, media, mimeType, parentMessageId } = req.body;
     const message = await spaceService.postMessage(req.user.id, req.params.channelId, {
       type,
       text,
       mediaBase64: media,
       mimeType,
+      parentMessageId,
     });
     res.status(201).json({ success: true, data: { ...message, mediaData: undefined } });
   } catch (error) {
     handle(res, error, 'Post message error');
+  }
+}
+
+async function listReplies(req, res) {
+  try {
+    const result = await spaceService.listReplies(req.user.id, req.params.messageId);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handle(res, error, 'List replies error');
   }
 }
 
@@ -272,6 +282,7 @@ module.exports = {
   deleteChannel,
   listMessages,
   postMessage,
+  listReplies,
   getMessageMedia,
   deleteMessage,
   requestToJoinDebate,

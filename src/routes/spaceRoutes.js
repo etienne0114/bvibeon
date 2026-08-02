@@ -24,6 +24,7 @@ router.delete('/channels/:channelId', auth, spaceController.deleteChannel);
 router.get('/channels/:channelId/messages', auth, spaceController.listMessages);
 router.post('/channels/:channelId/messages', auth, spaceController.postMessage);
 router.delete('/channels/:channelId/messages/:messageId', auth, spaceController.deleteMessage);
+router.get('/messages/:messageId/replies', auth, spaceController.listReplies);
 router.post('/channels/:channelId/debate/request', auth, spaceController.requestToJoinDebate);
 router.get('/channels/:channelId/debate/requests', auth, spaceController.listDebateRequests);
 router.get('/channels/:channelId/debate/participants', auth, spaceController.listApprovedDebateParticipants);

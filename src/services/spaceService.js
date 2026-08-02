@@ -249,10 +249,11 @@ class SpaceService {
     ]);
   }
 
+  /** Only top-level messages — replies live in their own thread, fetched via listReplies. */
   async listMessages(userId, channelId, limit = 50) {
     const channel = await this._requireMember(userId, channelId);
     const messages = await prisma.channelMessage.findMany({
-      where: { channelId },
+      where: { channelId, parentMessageId: null },
       orderBy: { createdAt: 'asc' },
       take: limit,
       select: {
@@ -262,12 +263,40 @@ class SpaceService {
         mimeType: true,
         createdAt: true,
         user: { select: { id: true, username: true } },
+        _count: { select: { replies: true } },
       },
     });
-    return { channel, messages };
+    return {
+      channel,
+      messages: messages.map((m) => ({ ...m, replyCount: m._count.replies, _count: undefined })),
+    };
   }
 
-  async postMessage(userId, channelId, { type, text, mediaBase64, mimeType }) {
+  /** The root message plus its full reply thread, oldest first. */
+  async listReplies(userId, messageId) {
+    const root = await prisma.channelMessage.findUnique({
+      where: { id: messageId },
+      include: { channel: true, user: { select: { id: true, username: true } } },
+    });
+    if (!root) throw new Error('Message not found.');
+    await this._requireMember(userId, root.channelId);
+
+    const replies = await prisma.channelMessage.findMany({
+      where: { parentMessageId: messageId },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        type: true,
+        text: true,
+        mimeType: true,
+        createdAt: true,
+        user: { select: { id: true, username: true } },
+      },
+    });
+    return { root, replies };
+  }
+
+  async postMessage(userId, channelId, { type, text, mediaBase64, mimeType, parentMessageId }) {
     const channel = await prisma.channel.findUnique({ where: { id: channelId } });
     if (!channel) throw new Error('Channel not found.');
     const membership = await prisma.spaceMembership.findUnique({
@@ -282,13 +311,21 @@ class SpaceService {
       }
     }
 
+    let parentId = null;
+    if (parentMessageId) {
+      const parent = await prisma.channelMessage.findUnique({ where: { id: parentMessageId } });
+      if (!parent || parent.channelId !== channelId) throw new Error('Original message not found.');
+      if (parent.parentMessageId) throw new Error("Replies can't be nested — reply on the original message.");
+      parentId = parentMessageId;
+    }
+
     const msgType = type === 'VOICE' || type === 'IMAGE' ? type : 'TEXT';
     if (msgType === 'TEXT') {
       const cleanText = (text || '').trim();
       if (!cleanText) throw new Error('Write something before sending.');
       if (cleanText.length > 2000) throw new Error('Keep messages under 2000 characters.');
       return prisma.channelMessage.create({
-        data: { channelId, userId, type: 'TEXT', text: cleanText },
+        data: { channelId, userId, type: 'TEXT', text: cleanText, parentMessageId: parentId },
         include: { user: { select: { id: true, username: true } } },
       });
     }
@@ -298,7 +335,7 @@ class SpaceService {
       throw new Error('That file is too large — keep clips/images small.');
     }
     return prisma.channelMessage.create({
-      data: { channelId, userId, type: msgType, mediaData: mediaBase64, mimeType: mimeType || null },
+      data: { channelId, userId, type: msgType, mediaData: mediaBase64, mimeType: mimeType || null, parentMessageId: parentId },
       include: { user: { select: { id: true, username: true } } },
     });
   }

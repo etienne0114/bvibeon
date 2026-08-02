@@ -216,6 +216,24 @@ async function listDebateRequests(req, res) {
   }
 }
 
+async function listApprovedDebateParticipants(req, res) {
+  try {
+    const participants = await spaceService.listApprovedDebateParticipants(req.user.id, req.params.channelId);
+    res.json({ success: true, data: participants });
+  } catch (error) {
+    handle(res, error, 'List approved debate participants error');
+  }
+}
+
+async function revokeDebateApproval(req, res) {
+  try {
+    const request = await spaceService.revokeDebateApproval(req.user.id, req.params.requestId);
+    res.json({ success: true, data: request });
+  } catch (error) {
+    handle(res, error, 'Revoke debate approval error');
+  }
+}
+
 async function resolveDebateRequest(req, res) {
   try {
     const { approve } = req.body;
@@ -258,6 +276,8 @@ module.exports = {
   deleteMessage,
   requestToJoinDebate,
   listDebateRequests,
+  listApprovedDebateParticipants,
+  revokeDebateApproval,
   resolveDebateRequest,
   getMyDebateStatus,
 };

@@ -363,6 +363,29 @@ class SpaceService {
     });
   }
 
+  /** Moderator visibility into who can currently post in a debate — the
+   * pending queue alone doesn't show this, so there was no way to see (or
+   * revoke) someone already approved. */
+  async listApprovedDebateParticipants(userId, channelId) {
+    const channel = await prisma.channel.findUnique({ where: { id: channelId } });
+    if (!channel) throw new Error('Channel not found.');
+    await this._requireModerator(userId, channel.spaceId);
+    return prisma.debateRequest.findMany({
+      where: { channelId, status: 'APPROVED' },
+      orderBy: { createdAt: 'asc' },
+      include: { user: { select: { id: true, username: true } } },
+    });
+  }
+
+  /** Puts an approved participant back to DECLINED — they can re-request if they want back in. */
+  async revokeDebateApproval(userId, requestId) {
+    const request = await prisma.debateRequest.findUnique({ where: { id: requestId }, include: { channel: true } });
+    if (!request) throw new Error('Request not found.');
+    await this._requireModerator(userId, request.channel.spaceId);
+    if (request.status !== 'APPROVED') throw new Error('This person is not currently approved.');
+    return prisma.debateRequest.update({ where: { id: requestId }, data: { status: 'DECLINED' } });
+  }
+
   async getMyDebateStatus(userId, channelId) {
     const request = await prisma.debateRequest.findUnique({ where: { channelId_userId: { channelId, userId } } });
     return request?.status || null;

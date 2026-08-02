@@ -13,7 +13,12 @@ const prisma = require('./utils/prismaClient');
 const app = express();
 // Behind Vercel/most proxies: needed so rate limiting sees the real client IP
 app.set('trust proxy', 1);
-app.use(helmet());
+// Helmet's default Cross-Origin-Resource-Policy is 'same-origin', which
+// silently blocks the frontend (fvibeon.vercel.app) from loading any
+// <img>/<audio> src pointing at this API (bvibeon.vercel.app) — a
+// different origin. CORS governs XHR/fetch access separately and still
+// applies; this only affects resources meant to be embedded as media.
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 
 // Auth uses Bearer tokens (not cookies), so an open CORS policy can't be used
 // for CSRF/session hijacking — but restricting it anyway is a free, low-risk

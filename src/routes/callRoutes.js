@@ -12,4 +12,8 @@ router.get('/:callSessionId/state', auth, callController.getCallState);
 router.post('/:callSessionId/raise-hand', auth, callController.raiseHand);
 router.post('/:callSessionId/lower-hand', auth, callController.lowerHand);
 router.post('/:callSessionId/advance-speaker', auth, callController.advanceSpeaker);
+router.get('/:callSessionId/join-request-status', auth, callController.getMyJoinRequestStatus);
+router.post('/:callSessionId/join-requests/:requesterId/resolve', auth, callController.resolveJoinRequest);
+router.patch('/:callSessionId/settings', auth, callController.updateCallSettings);
+router.post('/:callSessionId/participants/:targetUserId/remove', auth, callController.removeParticipant);
 module.exports = router;

@@ -59,6 +59,7 @@ model User {
   debateRequests     DebateRequest[]      @relation("DebateRequests")
   startedCalls       CallSession[]        @relation("StartedCalls")
   callParticipations CallParticipant[]    @relation("CallParticipations")
+  callJoinRequests   CallJoinRequest[]
 }
 
 model Course {
@@ -634,12 +635,29 @@ model CallSession {
   currentSpeakerId        String?
   currentSpeakerStartedAt DateTime?
   speakerQueue            String            @default("[]") @db.Text // JSON array of userIds, raise-order
+  requireApproval         Boolean           @default(false) // host must admit each new (non-participant) joiner
+  autoMuteOnJoin          Boolean           @default(false)
+  topic                   String?
   channel                 Channel           @relation(fields: [channelId], references: [id])
   starter                 User              @relation("StartedCalls", fields: [startedBy], references: [id])
   participants            CallParticipant[]
   signals                 CallSignal[]
+  joinRequests            CallJoinRequest[]
 
   @@index([channelId, endedAt])
+}
+
+model CallJoinRequest {
+  id            String      @id @default(uuid())
+  callSessionId String
+  userId        String
+  status        String      @default("PENDING") // PENDING | APPROVED | DENIED
+  createdAt     DateTime    @default(now())
+  callSession   CallSession @relation(fields: [callSessionId], references: [id])
+  user          User        @relation(fields: [userId], references: [id])
+
+  @@unique([callSessionId, userId])
+  @@index([callSessionId, status])
 }
 
 model CallParticipant {

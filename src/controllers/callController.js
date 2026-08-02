@@ -18,8 +18,14 @@ async function getActiveCall(req, res) {
 
 async function joinCall(req, res) {
   try {
-    const { speakingMode, speakerTimeSec } = req.body || {};
-    const result = await callService.joinCall(req.user.id, req.params.channelId, { speakingMode, speakerTimeSec });
+    const { speakingMode, speakerTimeSec, topic, requireApproval, autoMuteOnJoin } = req.body || {};
+    const result = await callService.joinCall(req.user.id, req.params.channelId, {
+      speakingMode,
+      speakerTimeSec,
+      topic,
+      requireApproval,
+      autoMuteOnJoin,
+    });
     res.status(201).json({ success: true, data: result });
   } catch (error) {
     handle(res, error, 'Join call error');
@@ -90,4 +96,55 @@ async function advanceSpeaker(req, res) {
   }
 }
 
-module.exports = { getActiveCall, joinCall, leaveCall, sendSignal, pollSignals, getCallState, raiseHand, lowerHand, advanceSpeaker };
+async function getMyJoinRequestStatus(req, res) {
+  try {
+    const status = await callService.getMyJoinRequestStatus(req.user.id, req.params.callSessionId);
+    res.json({ success: true, data: status });
+  } catch (error) {
+    handle(res, error, 'Get join request status error');
+  }
+}
+
+async function resolveJoinRequest(req, res) {
+  try {
+    const { decision } = req.body;
+    const result = await callService.resolveJoinRequest(req.user.id, req.params.callSessionId, req.params.requesterId, decision);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    handle(res, error, 'Resolve join request error');
+  }
+}
+
+async function updateCallSettings(req, res) {
+  try {
+    const state = await callService.updateCallSettings(req.user.id, req.params.callSessionId, req.body || {});
+    res.json({ success: true, data: state });
+  } catch (error) {
+    handle(res, error, 'Update call settings error');
+  }
+}
+
+async function removeParticipant(req, res) {
+  try {
+    const state = await callService.removeParticipant(req.user.id, req.params.callSessionId, req.params.targetUserId);
+    res.json({ success: true, data: state });
+  } catch (error) {
+    handle(res, error, 'Remove participant error');
+  }
+}
+
+module.exports = {
+  getActiveCall,
+  joinCall,
+  leaveCall,
+  sendSignal,
+  pollSignals,
+  getCallState,
+  raiseHand,
+  lowerHand,
+  advanceSpeaker,
+  getMyJoinRequestStatus,
+  resolveJoinRequest,
+  updateCallSettings,
+  removeParticipant,
+};

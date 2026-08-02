@@ -3,6 +3,8 @@ const prisma = require('../utils/prismaClient');
 const MAX_SIGNAL_PAYLOAD_BYTES = 8 * 1024; // SDP/ICE payloads are small text; this is generous headroom
 const MIN_SPEAKER_TIME_SEC = 15;
 const MAX_SPEAKER_TIME_SEC = 300;
+const MAX_TOPIC_LENGTH = 120;
+const HOST_ROLES = ['OWNER', 'MODERATOR'];
 
 /**
  * Voice/video calls — mesh WebRTC entirely on free, open infrastructure.
@@ -37,11 +39,30 @@ class CallService {
     return new Map(users.map((u) => [u.id, u.username]));
   }
 
-  /** Attaches speaking-turn state (mode, current speaker, raised-hand queue) to a session for API responses. */
-  async _withSpeakingState(session) {
+  /** Whoever started a call is its host, in addition to any space owner/moderator — a plain
+   * member starting a call still needs to be able to admit people and change its settings. */
+  _isHost(userId, role, session) {
+    return HOST_ROLES.includes(role) || session.startedBy === userId;
+  }
+
+  /** Attaches speaking-turn state and live call settings to a session for API responses.
+   * `viewerIsHost` — only the host gets the pending join-request list, since that's a
+   * moderation queue, not something every participant needs to see. */
+  async _withSpeakingState(session, viewerIsHost) {
     const queueIds = JSON.parse(session.speakerQueue || '[]');
     const idsNeeded = [...queueIds, ...(session.currentSpeakerId ? [session.currentSpeakerId] : [])];
     const usernames = await this._usernamesById(idsNeeded);
+
+    let joinRequests = [];
+    if (viewerIsHost) {
+      const pending = await prisma.callJoinRequest.findMany({
+        where: { callSessionId: session.id, status: 'PENDING' },
+        include: { user: { select: { id: true, username: true } } },
+        orderBy: { createdAt: 'asc' },
+      });
+      joinRequests = pending.map((r) => ({ userId: r.user.id, username: r.user.username }));
+    }
+
     return {
       speakingMode: session.speakingMode,
       speakerTimeSec: session.speakerTimeSec,
@@ -50,6 +71,13 @@ class CallService {
         : null,
       currentSpeakerStartedAt: session.currentSpeakerStartedAt,
       queue: queueIds.map((id) => ({ id, username: usernames.get(id) || 'Learner' })),
+      isHost: Boolean(viewerIsHost),
+      requireApproval: session.requireApproval,
+      autoMuteOnJoin: session.autoMuteOnJoin,
+      topic: session.topic,
+      startedBy: session.startedBy,
+      startedAt: session.startedAt,
+      joinRequests,
     };
   }
 
@@ -70,7 +98,7 @@ class CallService {
 
   /** The currently active call in a channel (if any), with its live participant list and speaking-turn state. */
   async getActiveCall(userId, channelId) {
-    await this._requireMember(userId, channelId);
+    const { role } = await this._requireMember(userId, channelId);
     const session = await prisma.callSession.findFirst({
       where: { channelId, endedAt: null },
       orderBy: { startedAt: 'desc' },
@@ -80,7 +108,7 @@ class CallService {
       where: { callSessionId: session.id, leftAt: null },
       include: { user: { select: { id: true, username: true } } },
     });
-    const speakingState = await this._withSpeakingState(session);
+    const speakingState = await this._withSpeakingState(session, this._isHost(userId, role, session));
     return { id: session.id, channelId: session.channelId, startedAt: session.startedAt, participants, ...speakingState };
   }
 
@@ -89,20 +117,33 @@ class CallService {
     await this._requireActiveParticipant(userId, callSessionId);
     const session = await prisma.callSession.findUnique({ where: { id: callSessionId } });
     if (!session) throw new Error('Call not found.');
+    const { role } = await this._requireMember(userId, session.channelId);
     const participants = await prisma.callParticipant.findMany({
       where: { callSessionId, leftAt: null },
       include: { user: { select: { id: true, username: true } } },
     });
-    const speakingState = await this._withSpeakingState(session);
+    const speakingState = await this._withSpeakingState(session, this._isHost(userId, role, session));
     return { participants, ...speakingState };
   }
 
-  /** Starts a call if none is active, or joins the existing one. `settings` (speaking mode/timer)
-   * only take effect when starting a brand-new call — a joiner inherits whatever's already running.
-   * Returns the session plus the OTHER already-active participants — the joiner is the one who
-   * initiates a WebRTC offer to each of them, avoiding offer/answer glare from both sides at once. */
+  /** Status of my own pending request to join an approval-gated call — polled while waiting. */
+  async getMyJoinRequestStatus(userId, callSessionId) {
+    const participant = await prisma.callParticipant.findUnique({ where: { callSessionId_userId: { callSessionId, userId } } });
+    if (participant) return { status: 'APPROVED' };
+    const request = await prisma.callJoinRequest.findUnique({ where: { callSessionId_userId: { callSessionId, userId } } });
+    return { status: request?.status || null };
+  }
+
+  /** Starts a call if none is active, or joins the existing one. `settings` (speaking mode/timer/topic/
+   * approval requirement) only take effect when starting a brand-new call — a joiner inherits whatever's
+   * already running. Returns the session plus the OTHER already-active participants — the joiner is the
+   * one who initiates a WebRTC offer to each of them, avoiding offer/answer glare from both sides at once.
+   *
+   * If the call requires host approval, a first-time joiner (not the host, never previously admitted)
+   * gets queued as a CallJoinRequest instead — the response comes back `{ pending: true }` and the caller
+   * should poll `getMyJoinRequestStatus` until a host admits them. */
   async joinCall(userId, channelId, settings) {
-    await this._requireMember(userId, channelId);
+    const { role } = await this._requireMember(userId, channelId);
 
     let session = await prisma.callSession.findFirst({ where: { channelId, endedAt: null } });
     if (!session) {
@@ -112,7 +153,35 @@ class CallService {
         speakerTimeSec = Number(settings?.speakerTimeSec) || 60;
         speakerTimeSec = Math.min(MAX_SPEAKER_TIME_SEC, Math.max(MIN_SPEAKER_TIME_SEC, speakerTimeSec));
       }
-      session = await prisma.callSession.create({ data: { channelId, startedBy: userId, speakingMode, speakerTimeSec } });
+      const topic = settings?.topic ? String(settings.topic).slice(0, MAX_TOPIC_LENGTH) : null;
+      session = await prisma.callSession.create({
+        data: {
+          channelId,
+          startedBy: userId,
+          speakingMode,
+          speakerTimeSec,
+          topic,
+          requireApproval: Boolean(settings?.requireApproval),
+          autoMuteOnJoin: Boolean(settings?.autoMuteOnJoin),
+        },
+      });
+    }
+
+    if (session.requireApproval && !this._isHost(userId, role, session)) {
+      const alreadyVetted = await prisma.callParticipant.findUnique({ where: { callSessionId_userId: { callSessionId: session.id, userId } } });
+      const approvedRequest = alreadyVetted
+        ? null
+        : await prisma.callJoinRequest.findUnique({ where: { callSessionId_userId: { callSessionId: session.id, userId } } });
+      const isVetted = alreadyVetted || approvedRequest?.status === 'APPROVED';
+
+      if (!isVetted) {
+        await prisma.callJoinRequest.upsert({
+          where: { callSessionId_userId: { callSessionId: session.id, userId } },
+          update: { status: 'PENDING', createdAt: new Date() },
+          create: { callSessionId: session.id, userId, status: 'PENDING' },
+        });
+        return { pending: true, callSessionId: session.id, topic: session.topic, speakingMode: session.speakingMode };
+      }
     }
 
     const existingParticipants = await prisma.callParticipant.findMany({
@@ -130,8 +199,105 @@ class CallService {
       data: { callSessionId: session.id, fromUserId: userId, toUserId: null, type: 'JOIN', payload: '{}' },
     });
 
-    const speakingState = await this._withSpeakingState(session);
+    const speakingState = await this._withSpeakingState(session, this._isHost(userId, role, session));
     return { callSessionId: session.id, participants: existingParticipants, ...speakingState };
+  }
+
+  /** Admits or declines someone waiting at the door — the call's host only. */
+  async resolveJoinRequest(hostId, callSessionId, requesterId, decision) {
+    const session = await prisma.callSession.findUnique({ where: { id: callSessionId } });
+    if (!session) throw new Error('Call not found.');
+    const { role } = await this._requireMember(hostId, session.channelId);
+    if (!this._isHost(hostId, role, session)) throw new Error('Only the host can admit or decline join requests.');
+    if (!['APPROVE', 'DENY'].includes(decision)) throw new Error('Invalid decision.');
+
+    const request = await prisma.callJoinRequest.findUnique({ where: { callSessionId_userId: { callSessionId, userId: requesterId } } });
+    if (!request) throw new Error('That join request no longer exists.');
+
+    if (decision === 'DENY') {
+      await prisma.callJoinRequest.update({ where: { id: request.id }, data: { status: 'DENIED' } });
+      return { requesterId, status: 'DENIED' };
+    }
+
+    await prisma.callJoinRequest.update({ where: { id: request.id }, data: { status: 'APPROVED' } });
+    await prisma.callParticipant.upsert({
+      where: { callSessionId_userId: { callSessionId, userId: requesterId } },
+      update: { leftAt: null, joinedAt: new Date() },
+      create: { callSessionId, userId: requesterId },
+    });
+    await prisma.callSignal.create({
+      data: { callSessionId, fromUserId: hostId, toUserId: null, type: 'JOIN', payload: '{}' },
+    });
+    return { requesterId, status: 'APPROVED' };
+  }
+
+  /** Live in-call settings, changeable mid-call by the host — owner/moderator only. Switching
+   * speaking mode resets the queue/speaker seat since it doesn't carry meaning across modes. */
+  async updateCallSettings(hostId, callSessionId, patch) {
+    const session = await prisma.callSession.findUnique({ where: { id: callSessionId } });
+    if (!session) throw new Error('Call not found.');
+    const { role } = await this._requireMember(hostId, session.channelId);
+    if (!this._isHost(hostId, role, session)) throw new Error('Only the host can change call settings.');
+
+    const data = {};
+    if (patch.topic !== undefined) data.topic = patch.topic ? String(patch.topic).slice(0, MAX_TOPIC_LENGTH) : null;
+    if (patch.requireApproval !== undefined) data.requireApproval = Boolean(patch.requireApproval);
+    if (patch.autoMuteOnJoin !== undefined) data.autoMuteOnJoin = Boolean(patch.autoMuteOnJoin);
+
+    if (patch.speakingMode !== undefined) {
+      const nextMode = patch.speakingMode === 'STRUCTURED' ? 'STRUCTURED' : 'OPEN';
+      if (nextMode !== session.speakingMode) {
+        data.speakingMode = nextMode;
+        data.currentSpeakerId = null;
+        data.currentSpeakerStartedAt = null;
+        data.speakerQueue = '[]';
+      }
+      if (nextMode === 'STRUCTURED') {
+        let speakerTimeSec = Number(patch.speakerTimeSec ?? session.speakerTimeSec) || 60;
+        data.speakerTimeSec = Math.min(MAX_SPEAKER_TIME_SEC, Math.max(MIN_SPEAKER_TIME_SEC, speakerTimeSec));
+      }
+    } else if (patch.speakerTimeSec !== undefined && session.speakingMode === 'STRUCTURED') {
+      data.speakerTimeSec = Math.min(MAX_SPEAKER_TIME_SEC, Math.max(MIN_SPEAKER_TIME_SEC, Number(patch.speakerTimeSec) || 60));
+    }
+
+    const updated = await prisma.callSession.update({ where: { id: callSessionId }, data });
+    return this._withSpeakingState(updated, this._isHost(hostId, role, updated));
+  }
+
+  /** Removes someone else from the call — the call's host only. They're sent a targeted
+   * KICKED signal so their own client tears down its side of the connection immediately. */
+  async removeParticipant(hostId, callSessionId, targetUserId) {
+    if (hostId === targetUserId) throw new Error("Use leave instead of removing yourself.");
+    const session = await prisma.callSession.findUnique({ where: { id: callSessionId } });
+    if (!session) throw new Error('Call not found.');
+    const { role } = await this._requireMember(hostId, session.channelId);
+    if (!this._isHost(hostId, role, session)) throw new Error('Only the host can remove participants.');
+
+    const participant = await prisma.callParticipant.findUnique({ where: { callSessionId_userId: { callSessionId, userId: targetUserId } } });
+    if (!participant || participant.leftAt) throw new Error('That person is not in the call.');
+
+    const queue = JSON.parse(session.speakerQueue || '[]').filter((id) => id !== targetUserId);
+    let updatedSession = await prisma.callSession.update({ where: { id: callSessionId }, data: { speakerQueue: JSON.stringify(queue) } });
+    if (updatedSession.currentSpeakerId === targetUserId) updatedSession = await this._promoteNext(updatedSession);
+
+    await prisma.callParticipant.update({ where: { id: participant.id }, data: { leftAt: new Date() } });
+    await prisma.callSignal.create({
+      data: { callSessionId, fromUserId: hostId, toUserId: targetUserId, type: 'KICKED', payload: '{}' },
+    });
+    // Broadcast as if the removed user announced their own departure, so everyone else's
+    // existing LEAVE handling tears down its peer connection to them — same as a real leave.
+    await prisma.callSignal.create({
+      data: { callSessionId, fromUserId: targetUserId, toUserId: null, type: 'LEAVE', payload: '{}' },
+    });
+
+    const stillActive = await prisma.callParticipant.count({ where: { callSessionId, leftAt: null } });
+    if (stillActive === 0) {
+      await prisma.$transaction([
+        prisma.callSession.update({ where: { id: callSessionId }, data: { endedAt: new Date() } }),
+        prisma.callSignal.deleteMany({ where: { callSessionId } }),
+      ]);
+    }
+    return this._withSpeakingState(updatedSession, this._isHost(hostId, role, updatedSession));
   }
 
   /** Raises your hand to speak (structured mode only) — promoted to speaker immediately if no one's talking. */
@@ -180,7 +346,7 @@ class CallService {
 
     if (!isSpeaker && !timerExpired) {
       const { role } = await this._requireMember(userId, session.channelId);
-      if (role !== 'OWNER' && role !== 'MODERATOR') throw new Error("It's not your turn yet.");
+      if (!this._isHost(userId, role, session)) throw new Error("It's not your turn yet.");
     }
 
     // Optimistic guard: only advance if the speaker seat hasn't already changed under us
@@ -229,7 +395,14 @@ class CallService {
       where: { callSessionId_userId: { callSessionId, userId } },
     });
     if (!participant || participant.leftAt) throw new Error("You're not in this call.");
-    if (!['OFFER', 'ANSWER', 'ICE_CANDIDATE'].includes(type)) throw new Error('Invalid signal type.');
+    if (!['OFFER', 'ANSWER', 'ICE_CANDIDATE', 'MEDIA_STATE', 'FORCE_MUTE'].includes(type)) throw new Error('Invalid signal type.');
+
+    if (type === 'FORCE_MUTE') {
+      const session = await prisma.callSession.findUnique({ where: { id: callSessionId } });
+      const { role } = await this._requireMember(userId, session.channelId);
+      if (!this._isHost(userId, role, session)) throw new Error('Only the host can mute someone else.');
+      if (!toUserId) throw new Error('FORCE_MUTE needs a target.');
+    }
 
     const payloadStr = typeof payload === 'string' ? payload : JSON.stringify(payload);
     if (Buffer.byteLength(payloadStr, 'utf8') > MAX_SIGNAL_PAYLOAD_BYTES) {

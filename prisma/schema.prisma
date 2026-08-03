@@ -58,6 +58,8 @@ model User {
   startedCalls       CallSession[]        @relation("StartedCalls")
   callParticipations CallParticipant[]    @relation("CallParticipations")
   callJoinRequests   CallJoinRequest[]
+  debateVotes        DebateVote[]
+  messageReactions   MessageReaction[]
 }
 
 model Course {
@@ -524,32 +526,50 @@ model Channel {
   description    String?
   type           String           @default("TEXT") // TEXT, DEBATE
   order          Int              @default(1)
+  debateQuestion String? // the motion/prompt — optional, a debate can be open-format
+  debatePolicies String?          @db.Text // ground rules the creator sets, shown to everyone
+  debatePhases   String?          @db.Text // JSON [{name, perSideSeconds}] — optional formal structure
   createdAt      DateTime         @default(now())
   space          Space            @relation(fields: [spaceId], references: [id])
   messages       ChannelMessage[]
   debateRequests DebateRequest[]
+  debateVotes    DebateVote[]
   callSessions   CallSession[]
 
   @@index([spaceId])
 }
 
 model ChannelMessage {
-  id               String           @id @default(uuid())
+  id               String            @id @default(uuid())
   channelId        String
   userId           String
-  type             String           @default("TEXT") // TEXT, VOICE, IMAGE
-  text             String?          @db.Text
-  mediaData        String?          @db.Text // base64, size-capped at submit time
+  type             String            @default("TEXT") // TEXT, VOICE, IMAGE
+  text             String?           @db.Text
+  mediaData        String?           @db.Text // base64, size-capped at submit time
   mimeType         String?
   parentMessageId  String?
-  createdAt        DateTime         @default(now())
-  channel          Channel          @relation(fields: [channelId], references: [id])
-  user             User             @relation("ChannelMessages", fields: [userId], references: [id])
-  parent           ChannelMessage?  @relation("MessageReplies", fields: [parentMessageId], references: [id], onDelete: Cascade)
-  replies          ChannelMessage[] @relation("MessageReplies")
+  createdAt        DateTime          @default(now())
+  channel          Channel           @relation(fields: [channelId], references: [id])
+  user             User              @relation("ChannelMessages", fields: [userId], references: [id])
+  parent           ChannelMessage?   @relation("MessageReplies", fields: [parentMessageId], references: [id], onDelete: Cascade)
+  replies          ChannelMessage[]  @relation("MessageReplies")
+  reactions        MessageReaction[]
 
   @@index([channelId, createdAt])
   @@index([parentMessageId])
+}
+
+model MessageReaction {
+  id        String         @id @default(uuid())
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime       @default(now())
+  message   ChannelMessage @relation(fields: [messageId], references: [id])
+  user      User           @relation(fields: [userId], references: [id])
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
 }
 
 model DebateRequest {
@@ -557,12 +577,27 @@ model DebateRequest {
   channelId String
   userId    String
   status    String   @default("PENDING") // PENDING, APPROVED, DECLINED
+  side      String? // FOR, AGAINST — optional, set by the host on approval
   createdAt DateTime @default(now())
   channel   Channel  @relation(fields: [channelId], references: [id])
   user      User     @relation("DebateRequests", fields: [userId], references: [id])
 
   @@unique([channelId, userId])
   @@index([channelId, status])
+}
+
+model DebateVote {
+  id        String   @id @default(uuid())
+  channelId String
+  userId    String
+  side      String // FOR, AGAINST, NEUTRAL
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  channel   Channel  @relation(fields: [channelId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([channelId, userId])
+  @@index([channelId, side])
 }
 
 // Voice/video calls — built entirely from scratch on free, open
@@ -588,6 +623,7 @@ model CallSession {
   requireApproval         Boolean           @default(false) // host must admit each new (non-participant) joiner
   autoMuteOnJoin          Boolean           @default(false)
   topic                   String?
+  currentPhaseIndex       Int? // index into the channel's debatePhases, if any — null = no formal phases
   channel                 Channel           @relation(fields: [channelId], references: [id])
   starter                 User              @relation("StartedCalls", fields: [startedBy], references: [id])
   participants            CallParticipant[]

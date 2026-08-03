@@ -246,8 +246,8 @@ async function revokeDebateApproval(req, res) {
 
 async function resolveDebateRequest(req, res) {
   try {
-    const { approve } = req.body;
-    const request = await spaceService.resolveDebateRequest(req.user.id, req.params.requestId, Boolean(approve));
+    const { approve, side } = req.body;
+    const request = await spaceService.resolveDebateRequest(req.user.id, req.params.requestId, Boolean(approve), side);
     res.json({ success: true, data: request });
   } catch (error) {
     handle(res, error, 'Resolve debate request error');
@@ -260,6 +260,33 @@ async function getMyDebateStatus(req, res) {
     res.json({ success: true, data: { status } });
   } catch (error) {
     handle(res, error, 'Get debate status error');
+  }
+}
+
+async function toggleMessageReaction(req, res) {
+  try {
+    const reactions = await spaceService.toggleMessageReaction(req.user.id, req.params.messageId, req.body.emoji);
+    res.json({ success: true, data: reactions });
+  } catch (error) {
+    handle(res, error, 'Toggle message reaction error');
+  }
+}
+
+async function castDebateVote(req, res) {
+  try {
+    const tally = await spaceService.castDebateVote(req.user.id, req.params.channelId, req.body.side);
+    res.json({ success: true, data: tally });
+  } catch (error) {
+    handle(res, error, 'Cast debate vote error');
+  }
+}
+
+async function getDebateVoteTally(req, res) {
+  try {
+    const tally = await spaceService.getDebateVoteTally(req.user.id, req.params.channelId);
+    res.json({ success: true, data: tally });
+  } catch (error) {
+    handle(res, error, 'Get debate vote tally error');
   }
 }
 
@@ -291,4 +318,7 @@ module.exports = {
   revokeDebateApproval,
   resolveDebateRequest,
   getMyDebateStatus,
+  toggleMessageReaction,
+  castDebateVote,
+  getDebateVoteTally,
 };

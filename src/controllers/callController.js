@@ -133,6 +133,15 @@ async function removeParticipant(req, res) {
   }
 }
 
+async function advancePhase(req, res) {
+  try {
+    const state = await callService.advancePhase(req.user.id, req.params.callSessionId);
+    res.json({ success: true, data: state });
+  } catch (error) {
+    handle(res, error, 'Advance phase error');
+  }
+}
+
 module.exports = {
   getActiveCall,
   joinCall,
@@ -147,4 +156,5 @@ module.exports = {
   resolveJoinRequest,
   updateCallSettings,
   removeParticipant,
+  advancePhase,
 };

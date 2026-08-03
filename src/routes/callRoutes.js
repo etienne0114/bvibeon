@@ -16,4 +16,5 @@ router.get('/:callSessionId/join-request-status', auth, callController.getMyJoin
 router.post('/:callSessionId/join-requests/:requesterId/resolve', auth, callController.resolveJoinRequest);
 router.patch('/:callSessionId/settings', auth, callController.updateCallSettings);
 router.post('/:callSessionId/participants/:targetUserId/remove', auth, callController.removeParticipant);
+router.post('/:callSessionId/advance-phase', auth, callController.advancePhase);
 module.exports = router;

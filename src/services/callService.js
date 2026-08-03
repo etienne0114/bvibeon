@@ -50,8 +50,9 @@ class CallService {
 
   /** Attaches speaking-turn state and live call settings to a session for API responses.
    * `viewerIsHost` — only the host gets the pending join-request list, since that's a
-   * moderation queue, not something every participant needs to see. */
-  async _withSpeakingState(session, viewerIsHost) {
+   * moderation queue, not something every participant needs to see. `channel` — optional;
+   * when given, surfaces the debate's formal phases (if any) alongside which one is active. */
+  async _withSpeakingState(session, viewerIsHost, channel) {
     const queueIds = JSON.parse(session.speakerQueue || '[]');
     const idsNeeded = [...queueIds, ...(session.currentSpeakerId ? [session.currentSpeakerId] : [])];
     const usernames = await this._usernamesById(idsNeeded);
@@ -81,6 +82,8 @@ class CallService {
       startedBy: session.startedBy,
       startedAt: session.startedAt,
       joinRequests,
+      phases: channel?.debatePhases ? JSON.parse(channel.debatePhases) : null,
+      currentPhaseIndex: session.currentPhaseIndex ?? null,
     };
   }
 
@@ -101,7 +104,7 @@ class CallService {
 
   /** The currently active call in a channel (if any), with its live participant list and speaking-turn state. */
   async getActiveCall(userId, channelId) {
-    const { role } = await this._requireMember(userId, channelId);
+    const { role, channel } = await this._requireMember(userId, channelId);
     const session = await prisma.callSession.findFirst({
       where: { channelId, endedAt: null },
       orderBy: { startedAt: 'desc' },
@@ -111,7 +114,7 @@ class CallService {
       where: { callSessionId: session.id, leftAt: null },
       include: { user: { select: { id: true, username: true } } },
     });
-    const speakingState = await this._withSpeakingState(session, this._isHost(userId, role, session));
+    const speakingState = await this._withSpeakingState(session, this._isHost(userId, role, session), channel);
     return { id: session.id, channelId: session.channelId, startedAt: session.startedAt, participants, ...speakingState };
   }
 
@@ -120,12 +123,12 @@ class CallService {
     await this._requireActiveParticipant(userId, callSessionId);
     const session = await prisma.callSession.findUnique({ where: { id: callSessionId } });
     if (!session) throw new Error('Call not found.');
-    const { role } = await this._requireMember(userId, session.channelId);
+    const { role, channel } = await this._requireMember(userId, session.channelId);
     const participants = await prisma.callParticipant.findMany({
       where: { callSessionId, leftAt: null },
       include: { user: { select: { id: true, username: true } } },
     });
-    const speakingState = await this._withSpeakingState(session, this._isHost(userId, role, session));
+    const speakingState = await this._withSpeakingState(session, this._isHost(userId, role, session), channel);
     return { participants, ...speakingState };
   }
 
@@ -146,14 +149,17 @@ class CallService {
    * gets queued as a CallJoinRequest instead — the response comes back `{ pending: true }` and the caller
    * should poll `getMyJoinRequestStatus` until a host admits them. */
   async joinCall(userId, channelId, settings) {
-    const { role } = await this._requireMember(userId, channelId);
+    const { role, channel } = await this._requireMember(userId, channelId);
 
     let session = await prisma.callSession.findFirst({ where: { channelId, endedAt: null } });
     if (!session) {
-      const speakingMode = settings?.speakingMode === 'STRUCTURED' ? 'STRUCTURED' : 'OPEN';
+      // A debate with formal phases starts straight into phase 1, structured, on that
+      // phase's timer — no need to hand-configure structured turns separately.
+      const phases = channel.debatePhases ? JSON.parse(channel.debatePhases) : null;
+      const speakingMode = phases || settings?.speakingMode === 'STRUCTURED' ? 'STRUCTURED' : 'OPEN';
       let speakerTimeSec = null;
       if (speakingMode === 'STRUCTURED') {
-        speakerTimeSec = Number(settings?.speakerTimeSec) || 60;
+        speakerTimeSec = phases ? phases[0].perSideSeconds : Number(settings?.speakerTimeSec) || 60;
         speakerTimeSec = Math.min(MAX_SPEAKER_TIME_SEC, Math.max(MIN_SPEAKER_TIME_SEC, speakerTimeSec));
       }
       const topic = settings?.topic ? String(settings.topic).slice(0, MAX_TOPIC_LENGTH) : null;
@@ -166,6 +172,7 @@ class CallService {
           topic,
           requireApproval: Boolean(settings?.requireApproval),
           autoMuteOnJoin: Boolean(settings?.autoMuteOnJoin),
+          currentPhaseIndex: phases ? 0 : null,
         },
       });
     }
@@ -207,7 +214,7 @@ class CallService {
       data: { callSessionId: session.id, fromUserId: userId, toUserId: null, type: 'JOIN', payload: '{}' },
     });
 
-    const speakingState = await this._withSpeakingState(session, this._isHost(userId, role, session));
+    const speakingState = await this._withSpeakingState(session, this._isHost(userId, role, session), channel);
     return { callSessionId: session.id, participants: existingParticipants, ...speakingState };
   }
 
@@ -249,7 +256,7 @@ class CallService {
   async updateCallSettings(hostId, callSessionId, patch) {
     const session = await prisma.callSession.findUnique({ where: { id: callSessionId } });
     if (!session) throw new Error('Call not found.');
-    const { role } = await this._requireMember(hostId, session.channelId);
+    const { role, channel } = await this._requireMember(hostId, session.channelId);
     if (!this._isHost(hostId, role, session)) throw new Error('Only the host can change call settings.');
 
     const data = {};
@@ -274,7 +281,38 @@ class CallService {
     }
 
     const updated = await prisma.callSession.update({ where: { id: callSessionId }, data });
-    return this._withSpeakingState(updated, this._isHost(hostId, role, updated));
+    return this._withSpeakingState(updated, this._isHost(hostId, role, updated), channel);
+  }
+
+  /** Advances a debate through its formal phases (opening statements → rebuttal → closing,
+   * etc.) — host only. Each phase carries its own per-side speaking time, reusing the
+   * existing structured-turns engine rather than a parallel timer system; advancing always
+   * clears the queue/speaker seat since it's a fresh round. */
+  async advancePhase(hostId, callSessionId) {
+    const session = await prisma.callSession.findUnique({ where: { id: callSessionId } });
+    if (!session) throw new Error('Call not found.');
+    const { role, channel } = await this._requireMember(hostId, session.channelId);
+    if (!this._isHost(hostId, role, session)) throw new Error('Only the host can advance the debate.');
+
+    const phases = channel.debatePhases ? JSON.parse(channel.debatePhases) : null;
+    if (!phases || !phases.length) throw new Error('This debate has no formal phases set.');
+    const currentIndex = session.currentPhaseIndex ?? -1;
+    if (currentIndex >= phases.length - 1) throw new Error('Already on the final phase.');
+
+    const nextIndex = currentIndex + 1;
+    const nextPhase = phases[nextIndex];
+    const updated = await prisma.callSession.update({
+      where: { id: callSessionId },
+      data: {
+        currentPhaseIndex: nextIndex,
+        speakingMode: 'STRUCTURED',
+        speakerTimeSec: nextPhase.perSideSeconds,
+        currentSpeakerId: null,
+        currentSpeakerStartedAt: null,
+        speakerQueue: '[]',
+      },
+    });
+    return this._withSpeakingState(updated, this._isHost(hostId, role, updated), channel);
   }
 
   /** Removes someone else from the call — the call's host only. They're sent a targeted
@@ -283,7 +321,7 @@ class CallService {
     if (hostId === targetUserId) throw new Error("Use leave instead of removing yourself.");
     const session = await prisma.callSession.findUnique({ where: { id: callSessionId } });
     if (!session) throw new Error('Call not found.');
-    const { role } = await this._requireMember(hostId, session.channelId);
+    const { role, channel } = await this._requireMember(hostId, session.channelId);
     if (!this._isHost(hostId, role, session)) throw new Error('Only the host can remove participants.');
 
     const participant = await prisma.callParticipant.findUnique({ where: { callSessionId_userId: { callSessionId, userId: targetUserId } } });
@@ -310,7 +348,7 @@ class CallService {
         prisma.callSignal.deleteMany({ where: { callSessionId } }),
       ]);
     }
-    return this._withSpeakingState(updatedSession, this._isHost(hostId, role, updatedSession));
+    return this._withSpeakingState(updatedSession, this._isHost(hostId, role, updatedSession), channel);
   }
 
   /** Raises your hand to speak (structured mode only) — promoted to speaker immediately if no one's talking. */

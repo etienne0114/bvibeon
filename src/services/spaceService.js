@@ -5,6 +5,30 @@ const logger = require('../utils/logger');
 const MAX_MEDIA_BYTES = 400 * 1024; // ~400KB — voice notes / images, base64-in-Postgres (no object storage wired up yet)
 const INVITE_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no ambiguous 0/O/1/I
 const RANK = { OWNER: 3, MODERATOR: 2, MEMBER: 1 };
+const MAX_QUESTION_LENGTH = 200;
+const MAX_POLICIES_LENGTH = 2000;
+const MAX_PHASES = 6;
+const MAX_PHASE_NAME_LENGTH = 60;
+const MIN_PHASE_SECONDS = 15;
+const MAX_PHASE_SECONDS = 600;
+const VOTE_SIDES = ['FOR', 'AGAINST', 'NEUTRAL'];
+const DEBATE_SIDES = ['FOR', 'AGAINST'];
+const MAX_REACTION_EMOJI_LENGTH = 8; // generous for multi-codepoint emoji, still cheap abuse guard
+
+/** Parses/validates the optional formal-phases structure a debate creator can set
+ * (e.g. opening statements → rebuttal → closing, each with its own per-side timer).
+ * Returns a JSON string to store, or null for an open-format debate. */
+function serializePhases(phases) {
+  if (!Array.isArray(phases) || phases.length === 0) return null;
+  const clean = phases.slice(0, MAX_PHASES).map((p) => {
+    const name = String(p?.name || '').trim().slice(0, MAX_PHASE_NAME_LENGTH);
+    if (!name) throw new Error('Every debate phase needs a name.');
+    let perSideSeconds = Number(p?.perSideSeconds) || 60;
+    perSideSeconds = Math.min(MAX_PHASE_SECONDS, Math.max(MIN_PHASE_SECONDS, perSideSeconds));
+    return { name, perSideSeconds };
+  });
+  return JSON.stringify(clean);
+}
 
 function generateInviteCode() {
   let code = '';
@@ -204,23 +228,29 @@ class SpaceService {
     ]);
   }
 
-  async createChannel(userId, spaceId, { name, description, type }) {
+  async createChannel(userId, spaceId, { name, description, type, debateQuestion, debatePolicies, debatePhases }) {
     await this._requireModerator(userId, spaceId);
     const cleanName = (name || '').trim();
     if (!cleanName) throw new Error('Give the channel a name.');
+    const isDebate = type === 'DEBATE';
     const count = await prisma.channel.count({ where: { spaceId } });
     return prisma.channel.create({
       data: {
         spaceId,
         name: cleanName,
         description: (description || '').trim() || null,
-        type: type === 'DEBATE' ? 'DEBATE' : 'TEXT',
+        type: isDebate ? 'DEBATE' : 'TEXT',
         order: count + 1,
+        // The motion is deliberately optional — a debate can just be a guided open
+        // discussion. Policies/phases only mean anything for a DEBATE channel.
+        debateQuestion: isDebate && debateQuestion ? String(debateQuestion).trim().slice(0, MAX_QUESTION_LENGTH) || null : null,
+        debatePolicies: isDebate && debatePolicies ? String(debatePolicies).trim().slice(0, MAX_POLICIES_LENGTH) || null : null,
+        debatePhases: isDebate ? serializePhases(debatePhases) : null,
       },
     });
   }
 
-  async updateChannel(userId, channelId, { name, description }) {
+  async updateChannel(userId, channelId, { name, description, debateQuestion, debatePolicies, debatePhases }) {
     const channel = await prisma.channel.findUnique({ where: { id: channelId } });
     if (!channel) throw new Error('Channel not found.');
     await this._requireModerator(userId, channel.spaceId);
@@ -231,6 +261,11 @@ class SpaceService {
       data.name = cleanName;
     }
     if (description !== undefined) data.description = (description || '').trim() || null;
+    if (channel.type === 'DEBATE') {
+      if (debateQuestion !== undefined) data.debateQuestion = debateQuestion ? String(debateQuestion).trim().slice(0, MAX_QUESTION_LENGTH) || null : null;
+      if (debatePolicies !== undefined) data.debatePolicies = debatePolicies ? String(debatePolicies).trim().slice(0, MAX_POLICIES_LENGTH) || null : null;
+      if (debatePhases !== undefined) data.debatePhases = serializePhases(debatePhases);
+    }
     return prisma.channel.update({ where: { id: channelId }, data });
   }
 
@@ -250,6 +285,19 @@ class SpaceService {
   }
 
   /** Only top-level messages — replies live in their own thread, fetched via listReplies. */
+  /** Folds raw {emoji,userId} reaction rows into display-ready pills: one per
+   * distinct emoji, with a count and whether the viewer is among them. */
+  _aggregateReactions(reactions, viewerId) {
+    const byEmoji = new Map();
+    for (const r of reactions) {
+      const entry = byEmoji.get(r.emoji) || { emoji: r.emoji, count: 0, reactedByMe: false };
+      entry.count += 1;
+      if (r.userId === viewerId) entry.reactedByMe = true;
+      byEmoji.set(r.emoji, entry);
+    }
+    return [...byEmoji.values()];
+  }
+
   async listMessages(userId, channelId, limit = 50) {
     const channel = await this._requireMember(userId, channelId);
     const messages = await prisma.channelMessage.findMany({
@@ -264,11 +312,17 @@ class SpaceService {
         createdAt: true,
         user: { select: { id: true, username: true } },
         _count: { select: { replies: true } },
+        reactions: { select: { emoji: true, userId: true } },
       },
     });
     return {
       channel,
-      messages: messages.map((m) => ({ ...m, replyCount: m._count.replies, _count: undefined })),
+      messages: messages.map((m) => ({
+        ...m,
+        replyCount: m._count.replies,
+        _count: undefined,
+        reactions: this._aggregateReactions(m.reactions, userId),
+      })),
     };
   }
 
@@ -291,9 +345,30 @@ class SpaceService {
         mimeType: true,
         createdAt: true,
         user: { select: { id: true, username: true } },
+        reactions: { select: { emoji: true, userId: true } },
       },
     });
-    return { root, replies };
+    return { root, replies: replies.map((r) => ({ ...r, reactions: this._aggregateReactions(r.reactions, userId) })) };
+  }
+
+  /** Toggles the caller's own reaction on a message — on if absent, off if already there. */
+  async toggleMessageReaction(userId, messageId, emoji) {
+    const cleanEmoji = String(emoji || '').trim().slice(0, MAX_REACTION_EMOJI_LENGTH);
+    if (!cleanEmoji) throw new Error('No emoji given.');
+    const message = await prisma.channelMessage.findUnique({ where: { id: messageId }, include: { channel: true } });
+    if (!message) throw new Error('Message not found.');
+    await this._requireMember(userId, message.channelId);
+
+    const existing = await prisma.messageReaction.findUnique({
+      where: { messageId_userId_emoji: { messageId, userId, emoji: cleanEmoji } },
+    });
+    if (existing) {
+      await prisma.messageReaction.delete({ where: { id: existing.id } });
+    } else {
+      await prisma.messageReaction.create({ data: { messageId, userId, emoji: cleanEmoji } });
+    }
+    const reactions = await prisma.messageReaction.findMany({ where: { messageId }, select: { emoji: true, userId: true } });
+    return this._aggregateReactions(reactions, userId);
   }
 
   async postMessage(userId, channelId, { type, text, mediaBase64, mimeType, parentMessageId }) {
@@ -390,13 +465,14 @@ class SpaceService {
     });
   }
 
-  async resolveDebateRequest(userId, requestId, approve) {
+  async resolveDebateRequest(userId, requestId, approve, side) {
     const request = await prisma.debateRequest.findUnique({ where: { id: requestId }, include: { channel: true } });
     if (!request) throw new Error('Request not found.');
     await this._requireModerator(userId, request.channel.spaceId);
+    if (side !== undefined && side !== null && !DEBATE_SIDES.includes(side)) throw new Error('Invalid side.');
     return prisma.debateRequest.update({
       where: { id: requestId },
-      data: { status: approve ? 'APPROVED' : 'DECLINED' },
+      data: { status: approve ? 'APPROVED' : 'DECLINED', side: approve ? side || null : null },
     });
   }
 
@@ -426,6 +502,32 @@ class SpaceService {
   async getMyDebateStatus(userId, channelId) {
     const request = await prisma.debateRequest.findUnique({ where: { channelId_userId: { channelId, userId } } });
     return request?.status || null;
+  }
+
+  /** Anyone in the space can vote FOR/AGAINST/NEUTRAL on a debate's motion, and change
+   * their mind anytime — an Oxford-style audience read, not a one-shot ballot. */
+  async castDebateVote(userId, channelId, side) {
+    const channel = await prisma.channel.findUnique({ where: { id: channelId } });
+    if (!channel || channel.type !== 'DEBATE') throw new Error('This is not a debate channel.');
+    if (!VOTE_SIDES.includes(side)) throw new Error('Invalid side.');
+    await this._requireMember(userId, channelId);
+    await prisma.debateVote.upsert({
+      where: { channelId_userId: { channelId, userId } },
+      update: { side },
+      create: { channelId, userId, side },
+    });
+    return this.getDebateVoteTally(userId, channelId);
+  }
+
+  async getDebateVoteTally(userId, channelId) {
+    await this._requireMember(userId, channelId);
+    const [votes, mine] = await Promise.all([
+      prisma.debateVote.groupBy({ by: ['side'], where: { channelId }, _count: true }),
+      prisma.debateVote.findUnique({ where: { channelId_userId: { channelId, userId } } }),
+    ]);
+    const counts = { FOR: 0, AGAINST: 0, NEUTRAL: 0 };
+    for (const v of votes) counts[v.side] = v._count;
+    return { counts, total: counts.FOR + counts.AGAINST + counts.NEUTRAL, myVote: mine?.side || null };
   }
 
   // --- internal guards ---

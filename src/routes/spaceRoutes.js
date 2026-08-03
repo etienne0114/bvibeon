@@ -31,6 +31,9 @@ router.get('/channels/:channelId/debate/participants', auth, spaceController.lis
 router.get('/channels/:channelId/debate/my-status', auth, spaceController.getMyDebateStatus);
 router.post('/debate/requests/:requestId/resolve', auth, spaceController.resolveDebateRequest);
 router.post('/debate/requests/:requestId/revoke', auth, spaceController.revokeDebateApproval);
+router.post('/channels/:channelId/debate/vote', auth, spaceController.castDebateVote);
+router.get('/channels/:channelId/debate/vote', auth, spaceController.getDebateVoteTally);
+router.post('/messages/:messageId/reactions', auth, spaceController.toggleMessageReaction);
 
 // Public — a plain <audio>/<img src> can't send an Authorization header.
 router.get('/messages/:messageId/media', spaceController.getMessageMedia);

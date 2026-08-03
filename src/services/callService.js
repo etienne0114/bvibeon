@@ -5,6 +5,9 @@ const MIN_SPEAKER_TIME_SEC = 15;
 const MAX_SPEAKER_TIME_SEC = 300;
 const MAX_TOPIC_LENGTH = 120;
 const HOST_ROLES = ['OWNER', 'MODERATOR'];
+// Mesh WebRTC cost grows with the square of participant count — this cap keeps
+// it from self-destructing rather than pretending it scales indefinitely.
+const MAX_CALL_PARTICIPANTS = 12;
 
 /**
  * Voice/video calls — mesh WebRTC entirely on free, open infrastructure.
@@ -189,6 +192,11 @@ class CallService {
       include: { user: { select: { id: true, username: true } } },
     });
 
+    const wasActive = existingParticipants.some((p) => p.userId === userId);
+    if (!wasActive && existingParticipants.length >= MAX_CALL_PARTICIPANTS) {
+      throw new Error(`This call is full (max ${MAX_CALL_PARTICIPANTS} participants).`);
+    }
+
     await prisma.callParticipant.upsert({
       where: { callSessionId_userId: { callSessionId: session.id, userId } },
       update: { leftAt: null, joinedAt: new Date() },
@@ -217,6 +225,11 @@ class CallService {
     if (decision === 'DENY') {
       await prisma.callJoinRequest.update({ where: { id: request.id }, data: { status: 'DENIED' } });
       return { requesterId, status: 'DENIED' };
+    }
+
+    const activeCount = await prisma.callParticipant.count({ where: { callSessionId, leftAt: null } });
+    if (activeCount >= MAX_CALL_PARTICIPANTS) {
+      throw new Error(`This call is full (max ${MAX_CALL_PARTICIPANTS} participants) — can't admit anyone else right now.`);
     }
 
     await prisma.callJoinRequest.update({ where: { id: request.id }, data: { status: 'APPROVED' } });
@@ -395,7 +408,9 @@ class CallService {
       where: { callSessionId_userId: { callSessionId, userId } },
     });
     if (!participant || participant.leftAt) throw new Error("You're not in this call.");
-    if (!['OFFER', 'ANSWER', 'ICE_CANDIDATE', 'MEDIA_STATE', 'FORCE_MUTE'].includes(type)) throw new Error('Invalid signal type.');
+    if (!['OFFER', 'ANSWER', 'ICE_CANDIDATE', 'MEDIA_STATE', 'FORCE_MUTE', 'SPEAKING', 'REACTION'].includes(type)) {
+      throw new Error('Invalid signal type.');
+    }
 
     if (type === 'FORCE_MUTE') {
       const session = await prisma.callSession.findUnique({ where: { id: callSessionId } });

@@ -47,8 +47,6 @@ model User {
   quizAttempts       QuizAttempt[]
   achievements       Achievement[]
   createdCourses     Course[]             @relation("CourseInstructor")
-  learningPaths      LearningPath[]
-  pathEnrollments    PathEnrollment[]
   skillSessions      SkillSession[]
   submittedSentences SentenceSubmission[] @relation("SubmittedSentences")
   givenCorrections   SentenceCorrection[] @relation("GivenCorrections")
@@ -81,7 +79,6 @@ model Course {
   lessons           Lesson[]
   enrollments       CourseEnrollment[]
   certificates      Certificate[]
-  pathSteps         PathStep[]
 
   @@index([status, category, level])
 }
@@ -136,53 +133,6 @@ model LessonProgress {
   @@unique([userId, lessonId])
   @@index([userId, lastAccessedAt(sort: Desc)])
   @@index([lessonId])
-}
-
-model LearningPath {
-  id                String           @id @default(uuid())
-  title             String
-  description       String?          @db.Text
-  difficulty        String           @default("BEGINNER")
-  creatorId         String
-  status            String           @default("DRAFT")
-  tags              String           @default("[]")
-  prerequisites     String           @default("[]")
-  estimatedDuration Int?             @default(0)
-  publishedAt       DateTime?
-  metadata          Json?
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-  creator           User             @relation(fields: [creatorId], references: [id])
-  steps             PathStep[]
-  enrollments       PathEnrollment[]
-}
-
-model PathStep {
-  id            String       @id @default(uuid())
-  pathId        String
-  courseId      String?
-  title         String
-  description   String?      @db.Text
-  order         Int
-  isRequired    Boolean      @default(true)
-  estimatedTime Int?         @default(0)
-  metadata      Json?
-  learningPath  LearningPath @relation(fields: [pathId], references: [id])
-  course        Course?      @relation(fields: [courseId], references: [id])
-}
-
-model PathEnrollment {
-  id            String       @id @default(uuid())
-  userId        String
-  pathId        String
-  progress      Int          @default(0)
-  status        String       @default("ACTIVE") // ACTIVE, COMPLETED
-  enrolledAt    DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  user          User         @relation(fields: [userId], references: [id])
-  learningPath  LearningPath @relation(fields: [pathId], references: [id])
-
-  @@unique([userId, pathId])
 }
 
 model LearningGoal {

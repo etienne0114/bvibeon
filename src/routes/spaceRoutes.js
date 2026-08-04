@@ -28,6 +28,7 @@ router.get('/messages/:messageId/replies', auth, spaceController.listReplies);
 router.post('/channels/:channelId/debate/request', auth, spaceController.requestToJoinDebate);
 router.get('/channels/:channelId/debate/requests', auth, spaceController.listDebateRequests);
 router.get('/channels/:channelId/debate/participants', auth, spaceController.listApprovedDebateParticipants);
+router.get('/channels/:channelId/debate/roster', auth, spaceController.listAllDebateParticipants);
 router.get('/channels/:channelId/debate/my-status', auth, spaceController.getMyDebateStatus);
 router.post('/debate/requests/:requestId/resolve', auth, spaceController.resolveDebateRequest);
 router.post('/debate/requests/:requestId/revoke', auth, spaceController.revokeDebateApproval);

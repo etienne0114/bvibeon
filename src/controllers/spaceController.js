@@ -235,6 +235,15 @@ async function listApprovedDebateParticipants(req, res) {
   }
 }
 
+async function listAllDebateParticipants(req, res) {
+  try {
+    const roster = await spaceService.listAllDebateParticipants(req.user.id, req.params.channelId);
+    res.json({ success: true, data: roster });
+  } catch (error) {
+    handle(res, error, 'List debate roster error');
+  }
+}
+
 async function revokeDebateApproval(req, res) {
   try {
     const request = await spaceService.revokeDebateApproval(req.user.id, req.params.requestId);
@@ -315,6 +324,7 @@ module.exports = {
   requestToJoinDebate,
   listDebateRequests,
   listApprovedDebateParticipants,
+  listAllDebateParticipants,
   revokeDebateApproval,
   resolveDebateRequest,
   getMyDebateStatus,

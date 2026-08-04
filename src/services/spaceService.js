@@ -496,6 +496,20 @@ class SpaceService {
     });
   }
 
+  /** Full roster across every status (pending/approved/declined) — moderator-only, for the
+   * participants sidebar. The three individual list/fetch methods above stay as they are
+   * (used elsewhere for the approval queue and the revoke flow); this is purely additive. */
+  async listAllDebateParticipants(userId, channelId) {
+    const channel = await prisma.channel.findUnique({ where: { id: channelId } });
+    if (!channel) throw new Error('Channel not found.');
+    await this._requireModerator(userId, channel.spaceId);
+    return prisma.debateRequest.findMany({
+      where: { channelId },
+      orderBy: { createdAt: 'asc' },
+      include: { user: { select: { id: true, username: true } } },
+    });
+  }
+
   /** Puts an approved participant back to DECLINED — they can re-request if they want back in. */
   async revokeDebateApproval(userId, requestId) {
     const request = await prisma.debateRequest.findUnique({ where: { id: requestId }, include: { channel: true } });

@@ -384,6 +384,12 @@ class SpaceService {
       if (!request || request.status !== 'APPROVED') {
         throw new Error('Request to join this debate before posting — a moderator needs to approve you first.');
       }
+      // The host (owner/moderator) posts the topics/motions that structure the debate;
+      // approved participants engage by replying within those threads, not by starting
+      // new top-level ones — keeps the discussion organized around what's being debated.
+      if (!parentMessageId) {
+        throw new Error('Debate participants can only reply to existing messages — the host posts new topics.');
+      }
     }
 
     let parentId = null;

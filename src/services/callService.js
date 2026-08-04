@@ -446,7 +446,7 @@ class CallService {
       where: { callSessionId_userId: { callSessionId, userId } },
     });
     if (!participant || participant.leftAt) throw new Error("You're not in this call.");
-    if (!['OFFER', 'ANSWER', 'ICE_CANDIDATE', 'MEDIA_STATE', 'FORCE_MUTE', 'SPEAKING', 'REACTION'].includes(type)) {
+    if (!['OFFER', 'ANSWER', 'ICE_CANDIDATE', 'MEDIA_STATE', 'FORCE_MUTE', 'SPEAKING', 'REACTION', 'CAPTION'].includes(type)) {
       throw new Error('Invalid signal type.');
     }
 

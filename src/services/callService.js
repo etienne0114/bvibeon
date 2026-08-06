@@ -42,6 +42,18 @@ class CallService {
     return new Map(users.map((u) => [u.id, u.username]));
   }
 
+  /** Tags each participant with their space role — lets the client know who the
+   * organizer (owner/moderator) is, e.g. to feature them by default in the call layout. */
+  async _attachRoles(spaceId, participants) {
+    if (!participants.length) return participants;
+    const memberships = await prisma.spaceMembership.findMany({
+      where: { spaceId, userId: { in: participants.map((p) => p.userId) } },
+      select: { userId: true, role: true },
+    });
+    const roleByUserId = new Map(memberships.map((m) => [m.userId, m.role]));
+    return participants.map((p) => ({ ...p, role: roleByUserId.get(p.userId) || 'MEMBER' }));
+  }
+
   /** Whoever started a call is its host, in addition to any space owner/moderator — a plain
    * member starting a call still needs to be able to admit people and change its settings. */
   _isHost(userId, role, session) {
@@ -110,10 +122,11 @@ class CallService {
       orderBy: { startedAt: 'desc' },
     });
     if (!session) return null;
-    const participants = await prisma.callParticipant.findMany({
+    let participants = await prisma.callParticipant.findMany({
       where: { callSessionId: session.id, leftAt: null },
       include: { user: { select: { id: true, username: true } } },
     });
+    participants = await this._attachRoles(channel.spaceId, participants);
     const speakingState = await this._withSpeakingState(session, this._isHost(userId, role, session), channel);
     return { id: session.id, channelId: session.channelId, startedAt: session.startedAt, participants, ...speakingState };
   }
@@ -124,10 +137,11 @@ class CallService {
     const session = await prisma.callSession.findUnique({ where: { id: callSessionId } });
     if (!session) throw new Error('Call not found.');
     const { role, channel } = await this._requireMember(userId, session.channelId);
-    const participants = await prisma.callParticipant.findMany({
+    let participants = await prisma.callParticipant.findMany({
       where: { callSessionId, leftAt: null },
       include: { user: { select: { id: true, username: true } } },
     });
+    participants = await this._attachRoles(channel.spaceId, participants);
     const speakingState = await this._withSpeakingState(session, this._isHost(userId, role, session), channel);
     return { participants, ...speakingState };
   }
@@ -153,6 +167,12 @@ class CallService {
 
     let session = await prisma.callSession.findFirst({ where: { channelId, endedAt: null } });
     if (!session) {
+      // A debate is moderated by design — only its host decides when the call actually
+      // starts; everyone else can only join one already running.
+      if (channel.type === 'DEBATE' && !HOST_ROLES.includes(role)) {
+        throw new Error('Only the host can start a call in a debate — ask them to start it, then join.');
+      }
+
       // A debate with formal phases starts straight into phase 1, structured, on that
       // phase's timer — no need to hand-configure structured turns separately.
       const phases = channel.debatePhases ? JSON.parse(channel.debatePhases) : null;
@@ -215,7 +235,7 @@ class CallService {
     });
 
     const speakingState = await this._withSpeakingState(session, this._isHost(userId, role, session), channel);
-    return { callSessionId: session.id, participants: existingParticipants, ...speakingState };
+    return { callSessionId: session.id, participants: await this._attachRoles(channel.spaceId, existingParticipants), ...speakingState };
   }
 
   /** Admits or declines someone waiting at the door — the call's host only. */

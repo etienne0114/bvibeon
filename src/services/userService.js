@@ -36,7 +36,11 @@ function sanitizeUser(user) {
   // expose a path to the dedicated serving endpoint instead, only when an avatar actually
   // exists. Relative to the API root (no leading /api) — same convention as messageMediaUrl
   // on the frontend, which prepends its own baseURL (already ending in /api in production).
-  return { ...safe, avatarUrl: avatarData ? `/auth/avatar/${user.id}` : null };
+  // The endpoint is cached for an hour (it's hit by plain <img> tags everywhere), so the URL
+  // is versioned by updatedAt — changing or removing the photo yields a new URL instead of
+  // relying on a CDN to notice the same URL's content changed underneath it.
+  const avatarUrl = avatarData ? `/auth/avatar/${user.id}?v=${new Date(user.updatedAt).getTime()}` : null;
+  return { ...safe, avatarUrl };
 }
 
 function generateCode() {

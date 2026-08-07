@@ -70,6 +70,7 @@ class SpaceService {
       prisma.space.findMany({
         where: { visibility: 'PUBLIC' },
         orderBy: { createdAt: 'desc' },
+        take: 200,
         include: { _count: { select: { memberships: true, channels: true } } },
       }),
       prisma.spaceMembership.findMany({
@@ -338,6 +339,7 @@ class SpaceService {
     const replies = await prisma.channelMessage.findMany({
       where: { parentMessageId: messageId },
       orderBy: { createdAt: 'asc' },
+      take: 500,
       select: {
         id: true,
         type: true,
@@ -421,8 +423,17 @@ class SpaceService {
     });
   }
 
+  // This is served to plain <audio>/<img src> tags, which can't send an Authorization header,
+  // so we can't check the requester's membership here. PUBLIC-space media is fine to serve to
+  // anyone; PRIVATE-space media must not be, or it leaks to anyone who ever sees the message ID
+  // (URL history, referrer headers, a shared link) regardless of space membership.
   async getMessageMedia(messageId) {
-    return prisma.channelMessage.findUnique({ where: { id: messageId } });
+    const message = await prisma.channelMessage.findUnique({
+      where: { id: messageId },
+      include: { channel: { include: { space: { select: { visibility: true } } } } },
+    });
+    if (!message || message.channel.space.visibility === 'PRIVATE') return null;
+    return message;
   }
 
   /** Own message always deletable; otherwise the actor must outrank the author (owner deletes anyone's, moderator deletes members' only). */

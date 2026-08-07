@@ -52,7 +52,7 @@ async function getAudioFile(req, res) {
 
 async function reportAudio(req, res) {
   try {
-    await audioContributionService.reportAudio(req.params.id);
+    await audioContributionService.reportAudio(req.user.id, req.params.id);
     res.json({ success: true });
   } catch (error) {
     if (isAppError(error)) {

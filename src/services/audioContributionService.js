@@ -61,10 +61,17 @@ class AudioContributionService {
     return contribution;
   }
 
-  async reportAudio(id) {
+  // One report per user, not per click — without this, a single account could call this
+  // endpoint HIDE_AFTER_REPORTS times and unilaterally hide anyone else's recording.
+  async reportAudio(userId, id) {
     const contribution = await prisma.audioContribution.findUnique({ where: { id } });
     if (!contribution) throw new Error('Recording not found.');
-    return prisma.audioContribution.update({ where: { id }, data: { reportCount: { increment: 1 } } });
+    const reporters = Array.isArray(contribution.reportedByUserIds) ? contribution.reportedByUserIds : [];
+    if (reporters.includes(userId)) return contribution;
+    return prisma.audioContribution.update({
+      where: { id },
+      data: { reportCount: { increment: 1 }, reportedByUserIds: [...reporters, userId] },
+    });
   }
 
   async getMyAudio(userId, limit = 30) {

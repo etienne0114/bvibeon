@@ -450,6 +450,7 @@ model AudioContribution {
   audioData     String          @db.Text // base64-encoded clip, size-capped at submit time
   mimeType      String          @default("audio/webm")
   reportCount   Int             @default(0)
+  reportedByUserIds Json        @default("[]") // dedupes reporters — one report per user, not per click
   createdAt     DateTime        @default(now())
   contributor   User            @relation("AudioContributions", fields: [contributorId], references: [id])
   vocabularyItem VocabularyItem? @relation(fields: [vocabularyItemId], references: [id])

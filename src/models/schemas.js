@@ -29,6 +29,11 @@ const profileSchema = z.object({
   dailyGoalMinutes: z.coerce.number().int().min(5).max(240).optional(),
 });
 
+const avatarSchema = z.object({
+  avatarBase64: z.string().min(1, 'Image data is required'),
+  mimeType: z.enum(['image/png', 'image/jpeg', 'image/webp', 'image/gif']),
+});
+
 const verifyEmailSchema = z.object({
   email: z.string().email().toLowerCase(),
   code: z.string().regex(/^\d{6}$/, 'Code must be 6 digits'),
@@ -78,6 +83,7 @@ module.exports = {
   registerStartSchema,
   registerCompleteSchema,
   profileSchema,
+  avatarSchema,
   loginSchema,
   changePasswordSchema,
   verifyEmailSchema,

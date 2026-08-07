@@ -9,6 +9,7 @@ const logger = require('../utils/logger');
 const SALT_ROUNDS = 10;
 const CODE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const MAX_VERIFY_ATTEMPTS = 5;
+const MAX_AVATAR_BYTES = 150 * 1024; // a small profile photo — kept tight since it's stored inline in Postgres
 
 class AuthError extends Error {
   constructor(message, { status = 400, requiresVerification = false } = {}) {
@@ -27,9 +28,15 @@ function sanitizeUser(user) {
     resetCode,
     resetExpiresAt,
     resetAttempts,
+    avatarData,
+    avatarMimeType,
     ...safe
   } = user;
-  return safe;
+  // Never inline the base64 blob in API responses (it'd bloat every login/me/update payload) —
+  // expose a path to the dedicated serving endpoint instead, only when an avatar actually
+  // exists. Relative to the API root (no leading /api) — same convention as messageMediaUrl
+  // on the frontend, which prepends its own baseURL (already ending in /api in production).
+  return { ...safe, avatarUrl: avatarData ? `/auth/avatar/${user.id}` : null };
 }
 
 function generateCode() {
@@ -183,6 +190,35 @@ async function completeRegistration({ email, code, password }) {
 async function updateProfile(userId, data) {
   const updated = await prisma.user.update({ where: { id: userId }, data });
   return { user: sanitizeUser(updated) };
+}
+
+async function uploadAvatar(userId, avatarBase64, mimeType) {
+  if (!avatarBase64 || !mimeType) {
+    throw new AuthError('An image and its type are required.');
+  }
+  if (Buffer.byteLength(avatarBase64, 'base64') > MAX_AVATAR_BYTES) {
+    throw new AuthError('That image is too large — keep it small (max 150KB).');
+  }
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: { avatarData: avatarBase64, avatarMimeType: mimeType },
+  });
+  return { user: sanitizeUser(updated) };
+}
+
+async function removeAvatar(userId) {
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: { avatarData: null, avatarMimeType: null },
+  });
+  return { user: sanitizeUser(updated) };
+}
+
+// Served to a plain <img src> (can't send an Authorization header), so this stays
+// unauthenticated by design — a profile picture is meant to be visible wherever the user's
+// name appears, the same as any public username, not access-controlled like private content.
+async function getAvatarFile(userId) {
+  return prisma.user.findUnique({ where: { id: userId }, select: { avatarData: true, avatarMimeType: true } });
 }
 
 async function changePassword(userId, { currentPassword, newPassword }) {
@@ -427,6 +463,9 @@ module.exports = {
   checkVerificationCode,
   completeRegistration,
   updateProfile,
+  uploadAvatar,
+  removeAvatar,
+  getAvatarFile,
   changePassword,
   loginUser,
   verifyEmail,

@@ -18,6 +18,8 @@ model User {
   password           String
   firstName          String?
   lastName           String?
+  avatarData         String?              @db.Text // base64-encoded, size-capped at upload time
+  avatarMimeType     String?
   preferredLanguage  String               @default("en")
   learningLanguage   String?
   proficiencyLevel   String?

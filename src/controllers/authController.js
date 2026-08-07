@@ -1,6 +1,6 @@
 const userService = require('../services/userService');
 const logger = require('../utils/logger');
-const { registerSchema, registerStartSchema, registerCompleteSchema, profileSchema, loginSchema, changePasswordSchema, verifyEmailSchema, resendCodeSchema, forgotPasswordSchema, resetPasswordSchema } = require('../models/schemas');
+const { registerSchema, registerStartSchema, registerCompleteSchema, profileSchema, avatarSchema, loginSchema, changePasswordSchema, verifyEmailSchema, resendCodeSchema, forgotPasswordSchema, resetPasswordSchema } = require('../models/schemas');
 
 function handleAuthError(res, error) {
   // Zod validation errors: surface the first human-readable issue
@@ -67,6 +67,38 @@ async function updateProfile(req, res) {
     res.json({ success: true, ...result });
   } catch (error) {
     handleAuthError(res, error);
+  }
+}
+
+async function uploadAvatar(req, res) {
+  try {
+    const { avatarBase64, mimeType } = avatarSchema.parse(req.body);
+    const result = await userService.uploadAvatar(req.user.id, avatarBase64, mimeType);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    handleAuthError(res, error);
+  }
+}
+
+async function removeAvatar(req, res) {
+  try {
+    const result = await userService.removeAvatar(req.user.id);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    handleAuthError(res, error);
+  }
+}
+
+async function getAvatar(req, res) {
+  try {
+    const user = await userService.getAvatarFile(req.params.userId);
+    if (!user || !user.avatarData) return res.status(404).json({ success: false, error: 'Not found' });
+    res.set('Content-Type', user.avatarMimeType || 'application/octet-stream');
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.send(Buffer.from(user.avatarData, 'base64'));
+  } catch (error) {
+    logger.error(`Get avatar error: ${error.message}`);
+    res.status(500).json({ success: false, error: 'Something went wrong on our side. Please try again.' });
   }
 }
 
@@ -165,6 +197,9 @@ module.exports = {
   registerCheckCode,
   registerComplete,
   updateProfile,
+  uploadAvatar,
+  removeAvatar,
+  getAvatar,
   changePassword,
   login,
   verifyEmail,
